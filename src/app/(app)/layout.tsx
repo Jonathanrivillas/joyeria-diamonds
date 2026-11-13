@@ -2,7 +2,9 @@ import { requireSesion, getAlcance } from "@/lib/session";
 import { Sidebar } from "@/components/sidebar";
 import { LocalSelector } from "@/components/local-selector";
 import { logout } from "@/app/login/actions";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogOut, KeyRound } from "lucide-react";
+
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSesion();
@@ -23,6 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <span className="block font-semibold leading-tight">{s.nombre}</span>
               <span className="block text-sm text-stone-500">{s.rol === "ADMIN" ? "Administrador" : "Vendedor"}</span>
             </p>
+            <Link href="/cambiar-clave" className="btn-secondary hidden min-h-[2.75rem] px-4 sm:inline-flex">
+              <KeyRound className="h-5 w-5" /> Mi clave
+            </Link>
+
             <form action={logout}>
               <button className="btn-secondary min-h-[2.75rem] px-4">
                 <LogOut className="h-5 w-5" /> Salir

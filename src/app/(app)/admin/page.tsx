@@ -105,7 +105,7 @@ export default async function AdminPage() {
             <p className="text-sm font-semibold">Crear usuario</p>
             <input name="nombre" className="input" placeholder="Nombre" required />
             <input name="email" type="email" className="input" placeholder="correo@joyeria.com" required />
-            <input name="password" type="password" className="input" placeholder="Contraseña (mín. 6)" minLength={6} required />
+            <input name="password" type="password" className="input" placeholder="Contraseña temporal (mín. 8)" minLength={8} required />
             <div className="grid grid-cols-2 gap-3">
               <select name="rol" className="input">
                 <option value="VENDEDOR">Vendedor</option>

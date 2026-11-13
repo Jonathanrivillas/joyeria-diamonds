@@ -45,11 +45,11 @@ export async function crearUsuario(form: FormData) {
   const password = String(form.get("password") || "");
   const rol = form.get("rol") === "ADMIN" ? "ADMIN" : "VENDEDOR";
   const localId = rol === "ADMIN" ? null : Number(form.get("localId")) || null;
-  if (!nombre || !email || password.length < 6) return;
+  if (!nombre || !email || password.length < 8) return;
   await db.usuario.upsert({
     where: { email },
-    create: { nombre, email, rol, localId, passwordHash: await bcrypt.hash(password, 10) },
-    update: { nombre, rol, localId, passwordHash: await bcrypt.hash(password, 10), activo: true },
+    create: { nombre, email, rol, localId, passwordHash: await bcrypt.hash(password, 10), debeCambiarClave: true },
+    update: { nombre, rol, localId, passwordHash: await bcrypt.hash(password, 10), activo: true, sesionVersion: { increment: 1 }, debeCambiarClave: true },
   });
   revalidatePath("/admin");
 }

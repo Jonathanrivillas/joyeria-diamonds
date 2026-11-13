@@ -10,7 +10,7 @@ export type Sesion = {
   rol: "ADMIN" | "VENDEDOR";
   localId: number | null;
   version: number;
-
+  debeCambiarClave?: boolean;
 };
 
 function clave() {

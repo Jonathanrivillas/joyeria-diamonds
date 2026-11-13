@@ -35,6 +35,7 @@ model Usuario {
   rol          String // ADMIN | VENDEDOR
   activo       Boolean      @default(true)
   sesionVersion Int      @default(0)
+  debeCambiarClave Boolean  @default(false)
   localId      Int?
   local        Local?       @relation(fields: [localId], references: [id])
   movimientos  Movimiento[]
@@ -190,4 +191,16 @@ model TrasladoItem {
   cantidad    Int
   traslado    Traslado  @relation(fields: [trasladoId], references: [id], onDelete: Cascade)
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
+}
+
+/// Registro de intentos de inicio de sesión (para bloquear ataques de fuerza bruta).
+model IntentoLogin {
+  id    Int      @id @default(autoincrement())
+  email String
+  ip    String
+  exito Boolean
+  fecha DateTime @default(now())
+
+  @@index([email, fecha])
+  @@index([ip, fecha])
 }

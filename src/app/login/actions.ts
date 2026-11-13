@@ -1,11 +1,26 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { COOKIE_SESION, firmarSesion } from "@/lib/token";
+import { COOKIE_SESION } from "@/lib/token";
+import { guardarCookieSesion } from "@/lib/sesion-cookie";
 import { COOKIE_LOCAL } from "@/lib/session";
+
+const VENTANA_MS = 15 * 60 * 1000; // 15 minutos
+const MAX_FALLOS_CORREO = 5;
+const MAX_FALLOS_IP = 20;
+
+// Cuando el correo no existe se compara contra este hash, para que la respuesta
+// tarde lo mismo y no revele qué correos están registrados.
+const HASH_FALSO = bcrypt.hashSync("no-es-una-clave-real", 10);
+
+async function ipCliente() {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0].trim() || h.get("x-real-ip") || "desconocida";
+}
+
 
 export async function login(
   _prev: { error?: string } | undefined,
@@ -16,27 +31,26 @@ export async function login(
     .toLowerCase();
   const password = String(form.get("password") || "");
 
-  const u = await db.usuario.findUnique({ where: { email } });
-  if (!u || !u.activo || !(await bcrypt.compare(password, u.passwordHash))) {
-    return { error: "Correo o contraseña incorrectos" };
+  const ip = await ipCliente();
+  const desde = new Date(Date.now() - VENTANA_MS);
+  const [fallosCorreo, fallosIp] = await Promise.all([
+    db.intentoLogin.count({ where: { email, exito: false, fecha: { gte: desde } } }),
+    db.intentoLogin.count({ where: { ip, exito: false, fecha: { gte: desde } } }),
+  ]);
+  if (fallosCorreo >= MAX_FALLOS_CORREO || fallosIp >= MAX_FALLOS_IP) {
+    return { error: "Hubo demasiados intentos fallidos. Por seguridad, espere 15 minutos e intente de nuevo." };
   }
 
-  const token = await firmarSesion({
-    id: u.id,
-    nombre: u.nombre,
-    email: u.email,
-    rol: u.rol as "ADMIN" | "VENDEDOR",
-    localId: u.localId,
-    version: u.sesionVersion,
-  });
+  const u = await db.usuario.findUnique({ where: { email } });
+  const claveOk = await bcrypt.compare(password, u?.passwordHash ?? HASH_FALSO);
+  if (!u || !u.activo || !claveOk) {
+    await db.intentoLogin.create({ data: { email, ip, exito: false } });
+    return { error: "Correo o contraseña incorrectos. Revise que estén bien escritos." };
+  }
+  await db.intentoLogin.create({ data: { email, ip, exito: true } });
+
+  await guardarCookieSesion(u);
   const c = await cookies();
-  c.set(COOKIE_SESION, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 10,
-  });
   c.delete(COOKIE_LOCAL);
   redirect("/");
 }

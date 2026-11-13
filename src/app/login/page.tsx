@@ -52,7 +52,7 @@ export default function LoginPage() {
           </div>
           {estado?.error && (
             <p role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-base font-medium text-red-800">
-              {estado.error}. Revise que estén bien escritos.
+              {estado.error}
             </p>
           )}
           <button className="btn-primary btn-grande w-full" disabled={pendiente}>
