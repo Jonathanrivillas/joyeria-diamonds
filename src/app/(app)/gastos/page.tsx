@@ -86,7 +86,7 @@ export default async function GastosPage({
                         {!localId && ` · ${g.local.nombre}`}
                       </p>
                       {g.soporte && (
-                        <a href={g.soporte} target="_blank" className="mt-1 inline-flex items-center gap-1 text-base font-medium text-oro-800 hover:underline">
+                        <a href={`/api/soporte/${g.id}`} target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1 text-base font-medium text-oro-800 hover:underline">
                           <Paperclip className="h-4 w-4" /> Ver recibo
                         </a>
                       )}

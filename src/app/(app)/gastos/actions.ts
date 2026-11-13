@@ -1,7 +1,8 @@
 "use server";
 
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { put } from "@vercel/blob";
+import { detectarTipoArchivo, TAMANO_MAXIMO } from "@/lib/archivos";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSesion, localParaOperar } from "@/lib/session";
@@ -28,13 +29,19 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   let soporte: string | null = null;
   const archivo = form.get("soporte");
   if (archivo instanceof File && archivo.size > 0) {
-    if (archivo.size > 4 * 1024 * 1024) return { error: "La foto es muy pesada (más de 4 MB). Intente con otra." };
-    const ext = path.extname(archivo.name).toLowerCase().replace(/[^.a-z0-9]/g, "") || ".bin";
-    const nombre = `gasto-${Date.now()}${ext}`;
-    const dir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, nombre), Buffer.from(await archivo.arrayBuffer()));
-    soporte = `/uploads/${nombre}`;
+    if (archivo.size > TAMANO_MAXIMO) return { error: "La foto es muy pesada (más de 4 MB). Intente con otra." };
+    const bytes = new Uint8Array(await archivo.arrayBuffer());
+    const tipo = detectarTipoArchivo(bytes);
+    if (!tipo) {
+      return { error: "Ese archivo no es una foto ni un PDF. Tome la foto otra vez o escoja otra imagen." };
+    }
+    // Nombre aleatorio: nadie puede adivinar la dirección de otro recibo.
+    const subido = await put(`soportes/${localId}/${randomUUID()}.${tipo.ext}`, Buffer.from(bytes), {
+      access: "public",
+      contentType: tipo.mime,
+      addRandomSuffix: true,
+    });
+    soporte = subido.url;
   }
 
   await db.gasto.create({
