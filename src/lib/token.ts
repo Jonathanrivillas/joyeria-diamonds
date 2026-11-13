@@ -12,20 +12,26 @@ export type Sesion = {
 };
 
 function clave() {
-  return new TextEncoder().encode(
-    process.env.SESSION_SECRET || "demo-joyeria-secreto-por-defecto-0123456789"
-  );
+  const secreto = process.env.SESSION_SECRET;
+  if (!secreto || secreto.length < 32) {
+    throw new Error(
+      "Falta SESSION_SECRET (mínimo 32 caracteres) en las variables de entorno.",
+    );
+  }
+  return new TextEncoder().encode(secreto);
 }
 
 export async function firmarSesion(s: Sesion): Promise<string> {
   return new SignJWT({ ...s })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("12h")
+    .setExpirationTime("10h")
     .sign(clave());
 }
 
-export async function verificarSesion(token: string | undefined): Promise<Sesion | null> {
+export async function verificarSesion(
+  token: string | undefined,
+): Promise<Sesion | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, clave());

@@ -4,16 +4,10 @@ import { useActionState, useState } from "react";
 import { Gem, Eye, EyeOff, LogIn } from "lucide-react";
 import { login } from "./actions";
 
-const DEMO = [
-  { email: "admin@joyeria.com", rol: "Administrador", detalle: "Ve los dos locales" },
-  { email: "vendedor1@joyeria.com", rol: "Vendedora", detalle: "Local 1" },
-  { email: "vendedor2@joyeria.com", rol: "Vendedor", detalle: "Local 2" },
-];
-
 export default function LoginPage() {
   const [estado, accion, pendiente] = useActionState(login, undefined);
-  const [email, setEmail] = useState("admin@joyeria.com");
-  const [password, setPassword] = useState("demo123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [ver, setVer] = useState(false);
 
   return (
@@ -65,26 +59,6 @@ export default function LoginPage() {
             <LogIn className="h-6 w-6" /> {pendiente ? "Entrando..." : "Entrar"}
           </button>
         </form>
-
-        <div className="mt-5 rounded-2xl bg-white/10 p-5 text-stone-100 ring-1 ring-white/10">
-          <p className="mb-3 text-lg font-semibold text-white">Usuarios de prueba (toque uno)</p>
-          <div className="grid gap-2">
-            {DEMO.map((d) => (
-              <button
-                key={d.email}
-                type="button"
-                onClick={() => {
-                  setEmail(d.email);
-                  setPassword("demo123");
-                }}
-                className={`rounded-xl px-4 py-3 text-left transition hover:bg-white/15 ${email === d.email ? "bg-white/15 ring-2 ring-oro-300" : ""}`}
-              >
-                <span className="block font-semibold">{d.rol} · {d.detalle}</span>
-                <span className="block text-sm text-stone-300">{d.email} · clave demo123</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
