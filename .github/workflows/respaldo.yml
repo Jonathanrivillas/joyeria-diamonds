@@ -1,0 +1,47 @@
+name: Respaldo nocturno
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 7:00 UTC = 2:00 a. m. en Colombia
+  workflow_dispatch: # permite correrlo a mano desde GitHub
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Instalar pg_dump 18
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-18
+
+      - name: Copiar la base de datos
+        env:
+          URL_BD: ${{ secrets.RESPALDO_DATABASE_URL }}
+        run: |
+          /usr/lib/postgresql/18/bin/pg_dump "$URL_BD" --format=custom --no-owner --no-privileges --file=respaldo.dump
+          ls -lh respaldo.dump
+
+      - name: Cifrar la copia
+        env:
+          CLAVE: ${{ secrets.RESPALDO_CLAVE }}
+        run: |
+          FECHA=$(TZ=America/Bogota date +%Y-%m-%d)
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$CLAVE" \
+              --symmetric --cipher-algo AES256 \
+              --output "respaldo-$FECHA.dump.gpg" respaldo.dump
+          shred -u respaldo.dump
+          echo "FECHA=$FECHA" >> "$GITHUB_ENV"
+
+      - name: Guardar la copia cifrada (30 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-${{ env.FECHA }}
+          path: respaldo-*.dump.gpg
+          retention-days: 30
+          if-no-files-found: error
