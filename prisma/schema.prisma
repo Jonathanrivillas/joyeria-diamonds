@@ -1,14 +1,14 @@
 // Inventario por gramos para joyería.
 // Pesos en centésimas de gramo (Int) y dinero en pesos COP (Int) para evitar errores de redondeo.
-// Para pasar a PostgreSQL: cambiar provider y DATABASE_URL.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Local {

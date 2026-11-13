@@ -25,7 +25,14 @@ export default async function VentasPage({
     ...(sp.metodo ? { metodoPago: sp.metodo } : {}),
     ...(sp.vendedor ? { usuarioId: Number(sp.vendedor) } : {}),
     ...(sp.estado ? { estado: sp.estado } : {}),
-    ...(sp.q ? { OR: [{ numero: { contains: sp.q } }, { clienteNombre: { contains: sp.q } }] } : {}),
+    ...(sp.q
+      ? {
+          OR: [
+            { numero: { contains: sp.q, mode: "insensitive" as const } },
+            { clienteNombre: { contains: sp.q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
   };
 
   const [ventas, usuarios] = await Promise.all([
