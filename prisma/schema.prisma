@@ -34,6 +34,7 @@ model Usuario {
   passwordHash String
   rol          String // ADMIN | VENDEDOR
   activo       Boolean      @default(true)
+  sesionVersion Int      @default(0)
   localId      Int?
   local        Local?       @relation(fields: [localId], references: [id])
   movimientos  Movimiento[]

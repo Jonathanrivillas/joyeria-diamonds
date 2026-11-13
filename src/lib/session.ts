@@ -1,18 +1,38 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { COOKIE_SESION, verificarSesion, type Sesion } from "./token";
 import { db } from "./db";
 
 export const COOKIE_LOCAL = "joyeria_local";
 
-export async function getSesion(): Promise<Sesion | null> {
+/**
+ * Sesión validada contra la base de datos: si el usuario fue desactivado
+ * o su versión cambió (ej. cambio de clave), la sesión deja de servir.
+ * `cache` evita repetir la consulta dentro de la misma petición.
+ */
+export const getSesion = cache(async (): Promise<Sesion | null> => {
   const c = await cookies();
-  return verificarSesion(c.get(COOKIE_SESION)?.value);
-}
+  const t = await verificarSesion(c.get(COOKIE_SESION)?.value);
+  if (!t) return null;
+  const u = await db.usuario.findUnique({
+    where: { id: t.id },
+    select: { id: true, nombre: true, email: true, rol: true, localId: true, activo: true, sesionVersion: true },
+  });
+  if (!u || !u.activo || u.sesionVersion !== t.version) return null;
+  return {
+    id: u.id,
+    nombre: u.nombre,
+    email: u.email,
+    rol: u.rol as Sesion["rol"],
+    localId: u.localId,
+    version: u.sesionVersion,
+  };
+});
 
 export async function requireSesion(): Promise<Sesion> {
   const s = await getSesion();
-  if (!s) redirect("/login");
+  if (!s) redirect("/login?salir=1");
   return s;
 }
 

@@ -27,6 +27,7 @@ export async function login(
     email: u.email,
     rol: u.rol as "ADMIN" | "VENDEDOR",
     localId: u.localId,
+    version: u.sesionVersion,
   });
   const c = await cookies();
   c.set(COOKIE_SESION, token, {

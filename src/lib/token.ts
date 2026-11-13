@@ -9,6 +9,8 @@ export type Sesion = {
   email: string;
   rol: "ADMIN" | "VENDEDOR";
   localId: number | null;
+  version: number;
+
 };
 
 function clave() {
@@ -41,6 +43,7 @@ export async function verificarSesion(
       email: payload.email as string,
       rol: payload.rol as Sesion["rol"],
       localId: (payload.localId as number | null) ?? null,
+      version: typeof payload.version === "number" ? payload.version : -1,
     };
   } catch {
     return null;

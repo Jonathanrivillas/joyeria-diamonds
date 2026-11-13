@@ -60,6 +60,9 @@ export async function alternarUsuario(form: FormData) {
   if (id === s.id) return;
   const u = await db.usuario.findUnique({ where: { id } });
   if (!u) return;
-  await db.usuario.update({ where: { id }, data: { activo: !u.activo } });
+  await db.usuario.update({
+    where: { id },
+    data: { activo: !u.activo, sesionVersion: { increment: 1 } },
+  });
   revalidatePath("/admin");
 }

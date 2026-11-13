@@ -8,6 +8,12 @@ export async function middleware(req: NextRequest) {
   const sesion = await verificarSesion(req.cookies.get(COOKIE_SESION)?.value);
 
   if (pathname.startsWith("/login")) {
+    // Sesión revocada: borrar la cookie y mostrar el login.
+    if (req.nextUrl.searchParams.has("salir")) {
+      const res = NextResponse.next();
+      res.cookies.delete(COOKIE_SESION);
+      return res;
+    }
     if (sesion) return NextResponse.redirect(new URL("/", req.url));
     return NextResponse.next();
   }
