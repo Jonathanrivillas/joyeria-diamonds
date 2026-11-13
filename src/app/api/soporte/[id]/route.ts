@@ -10,7 +10,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const s = await getSesion();
-  if (!s) return new NextResponse("No autorizado", { status: 401 });
+  if (!s || s.debeCambiarClave)
+    return new NextResponse("No autorizado", { status: 401 });
 
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return noEncontrado();

@@ -8,6 +8,11 @@ export async function cambiarLocal(valor: string) {
   const s = await requireSesion();
   if (s.rol !== "ADMIN") return;
   const c = await cookies();
-  c.set(COOKIE_LOCAL, valor, { path: "/", sameSite: "lax" });
+  c.set(COOKIE_LOCAL, valor, {
+    path: "/",
+    sameSite: "lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  });
   revalidatePath("/", "layout");
 }

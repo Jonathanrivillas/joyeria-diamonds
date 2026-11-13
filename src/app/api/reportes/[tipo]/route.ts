@@ -5,7 +5,9 @@ import { aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
 
 function csv(filas: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
-    const s = v === null || v === undefined ? "" : String(v);
+    let s = v === null || v === undefined ? "" : String(v);
+    // Evita que Excel interprete un texto como fórmula (=, +, -, @).
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   // ";" y BOM para que Excel en español lo abra bien
@@ -20,7 +22,7 @@ export async function GET(
 ) {
   const { tipo } = await params;
   const s = await getSesion();
-  if (!s) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!s || s.debeCambiarClave) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { localId } = await getAlcance(s);
   const whereLocal = localId ? { localId } : {};
   const desde = inicioDia(parseFechaISO(req.nextUrl.searchParams.get("desde")));
