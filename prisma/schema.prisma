@@ -101,6 +101,8 @@ model Venta {
   total           Int
   estado          String      @default("ACTIVA") // ACTIVA | ANULADA
   motivoAnulacion String?
+  anuladaPorId     Int?
+  anuladaEn        DateTime?
   localId         Int
   usuarioId       Int
   local           Local       @relation(fields: [localId], references: [id])
@@ -135,7 +137,10 @@ model Gasto {
   usuarioId     Int
   local         Local    @relation(fields: [localId], references: [id])
   usuario       Usuario  @relation(fields: [usuarioId], references: [id])
-
+  estado          String    @default("ACTIVO") // ACTIVO | ANULADO
+  motivoAnulacion String?
+  anuladoPorId    Int?
+  anuladoEn       DateTime?
   @@index([localId, fecha])
 }
 
@@ -203,4 +208,21 @@ model IntentoLogin {
 
   @@index([email, fecha])
   @@index([ip, fecha])
+}
+
+
+/// Registro de acciones delicadas: quién, qué, cuándo y desde dónde. Nunca se borra.
+model Auditoria {
+  id            Int      @id @default(autoincrement())
+  fecha         DateTime @default(now())
+  usuarioId     Int?
+  usuarioNombre String? // copia del nombre, por si el usuario cambia después
+  accion        String // ej. VENTA_ANULADA, GASTO_ANULADO
+  entidad       String? // ej. Venta, Gasto
+  entidadId     Int?
+  detalle       Json?
+  ip            String?
+
+  @@index([fecha])
+  @@index([entidad, entidadId])
 }

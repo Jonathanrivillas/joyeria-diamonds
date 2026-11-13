@@ -52,6 +52,8 @@ const GASTOS: [string, string, number, number][] = [
 
 async function main() {
   console.log("Limpiando base de datos...");
+  await db.auditoria.deleteMany();
+  await db.intentoLogin.deleteMany();
   await db.trasladoItem.deleteMany();
   await db.traslado.deleteMany();
   await db.arqueoDetalle.deleteMany();

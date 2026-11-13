@@ -5,8 +5,9 @@ import { put } from "@vercel/blob";
 import { detectarTipoArchivo, TAMANO_MAXIMO } from "@/lib/archivos";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireSesion, localParaOperar } from "@/lib/session";
+import { requireSesion, requireAdmin, localParaOperar } from "@/lib/session";
 import { parseCOP, TIPOS_GASTO } from "@/lib/format";
+import { auditar } from "@/lib/auditoria";
 
 export type EstadoGasto = { error?: string; ok?: string } | undefined;
 
@@ -51,9 +52,25 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   return { ok: "Listo, el gasto quedó guardado. Puede anotar otro si necesita." };
 }
 
-export async function eliminarGasto(form: FormData) {
-  const s = await requireSesion();
-  if (s.rol !== "ADMIN") return;
-  await db.gasto.delete({ where: { id: Number(form.get("id")) } });
+/** Los gastos nunca se borran: se anulan con motivo y quedan en el historial. */
+export async function anularGasto(form: FormData) {
+  const s = await requireAdmin();
+  const id = Number(form.get("id"));
+  const motivo = String(form.get("motivo") || "").trim();
+  if (!Number.isInteger(id) || !motivo) return;
+
+  await db.$transaction(async (tx) => {
+    const g = await tx.gasto.findUnique({ where: { id } });
+    if (!g || g.estado === "ANULADO") return;
+    await tx.gasto.update({
+      where: { id },
+      data: { estado: "ANULADO", motivoAnulacion: motivo, anuladoPorId: s.id, anuladoEn: new Date() },
+    });
+    await auditar(s, "GASTO_ANULADO", {
+      entidad: "Gasto",
+      entidadId: id,
+      detalle: { monto: g.monto, tipo: g.tipo, justificacion: g.justificacion, motivo },
+    }, tx);
+  });
   revalidatePath("/", "layout");
 }

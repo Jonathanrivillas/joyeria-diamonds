@@ -5,10 +5,14 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/inventario";
 import { parseGramos } from "@/lib/format";
+import { auditar } from "@/lib/auditoria";
 
 export type EstadoTraslado = { error?: string; ok?: string } | undefined;
 
-export async function crearTraslado(_prev: EstadoTraslado, form: FormData): Promise<EstadoTraslado> {
+export async function crearTraslado(
+  _prev: EstadoTraslado,
+  form: FormData,
+): Promise<EstadoTraslado> {
   const s = await requireAdmin();
   const origenId = Number(form.get("origenId"));
   const destinoId = Number(form.get("destinoId"));
@@ -17,21 +21,64 @@ export async function crearTraslado(_prev: EstadoTraslado, form: FormData): Prom
   const cantidad = Number(form.get("cantidad") || 0);
   const nota = String(form.get("nota") || "").trim() || null;
 
-  if (!origenId || !destinoId || origenId === destinoId) return { error: "El local que envía y el que recibe deben ser distintos." };
+  if (!origenId || !destinoId || origenId === destinoId)
+    return { error: "El local que envía y el que recibe deben ser distintos." };
   const cat = await db.categoria.findUnique({ where: { id: categoriaId } });
   if (!cat) return { error: "Ese tipo de pieza no existe." };
-  if (Number.isNaN(pesoCg) || (cat.controlaPeso && pesoCg <= 0)) return { error: "Escriba cuánto pesa lo que va a mover." };
-  if (!Number.isInteger(cantidad) || cantidad <= 0) return { error: "Escriba cuántas piezas son." };
+  if (Number.isNaN(pesoCg) || (cat.controlaPeso && pesoCg <= 0))
+    return { error: "Escriba cuánto pesa lo que va a mover." };
+  if (!Number.isInteger(cantidad) || cantidad <= 0)
+    return { error: "Escriba cuántas piezas son." };
   const peso = cat.controlaPeso ? pesoCg : 0;
 
   try {
     await db.$transaction(async (tx) => {
       const t = await tx.traslado.create({
-        data: { origenId, destinoId, usuarioId: s.id, nota, items: { create: [{ categoriaId, pesoCg: peso, cantidad }] } },
+        data: {
+          origenId,
+          destinoId,
+          usuarioId: s.id,
+          nota,
+          items: { create: [{ categoriaId, pesoCg: peso, cantidad }] },
+        },
       });
       const ref = `TR-${t.id}`;
-      await registrarMovimiento(tx, { localId: origenId, categoriaId, usuarioId: s.id, tipo: "TRASLADO_SALIDA", pesoCg: -peso, cantidad: -cantidad, referencia: ref, nota: nota ?? undefined });
-      await registrarMovimiento(tx, { localId: destinoId, categoriaId, usuarioId: s.id, tipo: "TRASLADO_ENTRADA", pesoCg: peso, cantidad, referencia: ref, nota: nota ?? undefined });
+      await registrarMovimiento(tx, {
+        localId: origenId,
+        categoriaId,
+        usuarioId: s.id,
+        tipo: "TRASLADO_SALIDA",
+        pesoCg: -peso,
+        cantidad: -cantidad,
+        referencia: ref,
+        nota: nota ?? undefined,
+      });
+      await registrarMovimiento(tx, {
+        localId: destinoId,
+        categoriaId,
+        usuarioId: s.id,
+        tipo: "TRASLADO_ENTRADA",
+        pesoCg: peso,
+        cantidad,
+        referencia: ref,
+        nota: nota ?? undefined,
+      });
+      await auditar(
+        s,
+        "TRASLADO",
+        {
+          entidad: "Traslado",
+          entidadId: t.id,
+          detalle: {
+            origenId,
+            destinoId,
+            categoria: cat.nombre,
+            pesoCg: peso,
+            cantidad,
+          },
+        },
+        tx,
+      );
     });
   } catch (e) {
     return { error: (e as Error).message };

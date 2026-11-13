@@ -1,6 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { Paperclip, Trash2 } from "lucide-react";
+import { Paperclip, Ban } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
@@ -8,7 +8,7 @@ import { cop, cuando, TIPOS_GASTO } from "@/lib/format";
 import { PageHeader, Vacio } from "@/components/ui";
 import { BotonConfirmar } from "@/components/confirmar";
 import { GastoForm } from "./gasto-form";
-import { eliminarGasto } from "./actions";
+import { anularGasto } from "./actions";
 
 export default async function GastosPage({
   searchParams,
@@ -27,9 +27,10 @@ export default async function GastosPage({
     orderBy: { fecha: "desc" },
     include: { local: true, usuario: true },
   });
-  const total = gastos.reduce((a, g) => a + g.monto, 0);
+  const activos = gastos.filter((g) => g.estado === "ACTIVO");
+  const total = activos.reduce((a, g) => a + g.monto, 0);
   const porTipo = Object.keys(TIPOS_GASTO)
-    .map((t) => ({ tipo: t, total: gastos.filter((g) => g.tipo === t).reduce((a, g) => a + g.monto, 0) }))
+    .map((t) => ({ tipo: t, total: activos.filter((g) => g.tipo === t).reduce((a, g) => a + g.monto, 0) }))
     .filter((t) => t.total > 0);
 
   const rapidos = [
@@ -78,9 +79,12 @@ export default async function GastosPage({
             ) : (
               <ul className="divide-y divide-stone-100">
                 {gastos.map((g) => (
-                  <li key={g.id} className="flex items-start gap-4 px-5 py-4">
+                  <li key={g.id} className={clsx("flex items-start gap-4 px-5 py-4", g.estado === "ANULADO" && "bg-stone-50 opacity-60")}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-lg font-semibold">{g.justificacion}</p>
+                      <p className={clsx("text-lg font-semibold", g.estado === "ANULADO" && "line-through")}>{g.justificacion}</p>
+                      {g.estado === "ANULADO" && (
+                        <p className="text-base font-semibold text-red-700">Anulado: {g.motivoAnulacion}</p>
+                      )}
                       <p className="text-base text-stone-500">
                         {TIPOS_GASTO[g.tipo]} · {cuando(g.fecha)} · {g.usuario.nombre}
                         {!localId && ` · ${g.local.nombre}`}
@@ -91,17 +95,22 @@ export default async function GastosPage({
                         </a>
                       )}
                     </div>
-                    <p className="text-xl font-bold tabular-nums">{cop(g.monto)}</p>
-                    {s.rol === "ADMIN" && (
+                    <p className={clsx("text-xl font-bold tabular-nums", g.estado === "ANULADO" && "line-through")}>{cop(g.monto)}</p>
+                    {s.rol === "ADMIN" && g.estado === "ACTIVO" && (
                       <BotonConfirmar
-                        action={eliminarGasto}
+                        action={anularGasto}
                         claseBoton="btn-secondary min-h-[2.75rem] px-3 text-red-700"
-                        textoBoton={<Trash2 className="h-5 w-5" aria-label="Borrar" />}
-                        titulo="¿Borrar este gasto?"
-                        mensaje={<>Se borrará «{g.justificacion}» por {cop(g.monto)}. Esto no se puede deshacer.</>}
-                        textoConfirmar="Sí, borrar"
+                        textoBoton={<Ban className="h-5 w-5" aria-label="Anular" />}
+                        titulo="¿Anular este gasto?"
+                        mensaje={<>«{g.justificacion}» por {cop(g.monto)} dejará de contar en los totales, pero quedará guardado en el historial.</>}
+                        textoConfirmar="Sí, anular"
                         campos={{ id: g.id }}
-                      />
+                      >
+                        <div>
+                          <label className="label">¿Por qué lo anula?</label>
+                          <input name="motivo" className="input" required placeholder="Ej: se anotó dos veces" />
+                        </div>
+                      </BotonConfirmar>
                     )}
                   </li>
                 ))}

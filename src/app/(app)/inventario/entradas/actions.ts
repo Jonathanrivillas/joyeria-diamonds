@@ -5,10 +5,14 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/inventario";
 import { parseGramos } from "@/lib/format";
+import { auditar } from "@/lib/auditoria";
 
 export type EstadoForm = { error?: string; ok?: string } | undefined;
 
-export async function registrarEntrada(_prev: EstadoForm, form: FormData): Promise<EstadoForm> {
+export async function registrarEntrada(
+  _prev: EstadoForm,
+  form: FormData,
+): Promise<EstadoForm> {
   const s = await requireAdmin();
   const localId = Number(form.get("localId"));
   const categoriaId = Number(form.get("categoriaId"));
@@ -16,15 +20,21 @@ export async function registrarEntrada(_prev: EstadoForm, form: FormData): Promi
   const cantidad = Number(form.get("cantidad") || 0);
   const nota = String(form.get("nota") || "").trim();
 
-  if (!localId || !categoriaId) return { error: "Escoja el local y el tipo de pieza." };
+  if (!localId || !categoriaId)
+    return { error: "Escoja el local y el tipo de pieza." };
   const cat = await db.categoria.findUnique({ where: { id: categoriaId } });
   if (!cat) return { error: "Ese tipo de pieza no existe." };
-  if (Number.isNaN(pesoCg) || pesoCg < 0) return { error: "El peso no se entiende. Escriba solo el número, ej: 5,20" };
-  if (cat.controlaPeso && pesoCg <= 0) return { error: "Escriba cuánto pesa lo que llegó." };
-  if (!Number.isInteger(cantidad) || cantidad <= 0) return { error: "Escriba cuántas piezas son." };
+  if (Number.isNaN(pesoCg) || pesoCg < 0)
+    return {
+      error: "El peso no se entiende. Escriba solo el número, ej: 5,20",
+    };
+  if (cat.controlaPeso && pesoCg <= 0)
+    return { error: "Escriba cuánto pesa lo que llegó." };
+  if (!Number.isInteger(cantidad) || cantidad <= 0)
+    return { error: "Escriba cuántas piezas son." };
 
-  await db.$transaction((tx) =>
-    registrarMovimiento(tx, {
+  await db.$transaction(async (tx) => {
+    await registrarMovimiento(tx, {
       localId,
       categoriaId,
       usuarioId: s.id,
@@ -32,8 +42,24 @@ export async function registrarEntrada(_prev: EstadoForm, form: FormData): Promi
       pesoCg: cat.controlaPeso ? pesoCg : 0,
       cantidad,
       nota: nota || "Ingreso de mercancía",
-    })
-  );
+    });
+    await auditar(
+      s,
+      "ENTRADA_MERCANCIA",
+      {
+        entidad: "Categoria",
+        entidadId: categoriaId,
+        detalle: {
+          localId,
+          categoria: cat.nombre,
+          pesoCg: cat.controlaPeso ? pesoCg : 0,
+          cantidad,
+          nota,
+        },
+      },
+      tx,
+    );
+  });
   revalidatePath("/inventario");
   return { ok: `Listo. Se sumó al inventario de ${cat.nombre}.` };
 }

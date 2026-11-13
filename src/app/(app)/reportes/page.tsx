@@ -34,7 +34,7 @@ export default async function ReportesPage({
           where: { localId: l.id, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } },
           _sum: { total: true },
         }),
-        db.gasto.groupBy({ by: ["tipo"], where: { localId: l.id, fecha: { gte: desde, lte: hasta } }, _sum: { monto: true } }),
+        db.gasto.groupBy({ by: ["tipo"], where: { localId: l.id, estado: "ACTIVO", fecha: { gte: desde, lte: hasta } }, _sum: { monto: true } }),
         db.arqueo.findFirst({
           where: { localId: l.id, estado: "CERRADO", fecha: { gte: desde, lte: hasta } },
           orderBy: { fecha: "desc" },
@@ -50,7 +50,7 @@ export default async function ReportesPage({
   const nDias = Math.min(62, Math.round((inicioDia(hasta).getTime() - gDesde.getTime()) / 86400000) + 1);
   const [ventasRango, gastosRango, itemsRango, categorias] = await Promise.all([
     db.venta.findMany({ where: { ...whereLocal, estado: "ACTIVA", fecha: { gte: gDesde, lte: hasta } }, select: { fecha: true, total: true } }),
-    db.gasto.findMany({ where: { ...whereLocal, fecha: { gte: gDesde, lte: hasta } }, select: { fecha: true, monto: true } }),
+    db.gasto.findMany({ where: { ...whereLocal, estado: "ACTIVO", fecha: { gte: gDesde, lte: hasta } }, select: { fecha: true, monto: true } }),
     db.ventaItem.groupBy({
       by: ["categoriaId"],
       where: { venta: { ...whereLocal, estado: "ACTIVA", fecha: { gte: gDesde, lte: hasta } } },

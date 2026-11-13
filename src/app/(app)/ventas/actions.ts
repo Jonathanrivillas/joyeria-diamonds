@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireSesion, localParaOperar } from "@/lib/session";
 import { registrarMovimiento, siguienteNumeroFactura } from "@/lib/inventario";
+import { auditar } from "@/lib/auditoria";
 
 const ItemSchema = z.object({
   categoriaId: z.number().int().positive(),
@@ -108,7 +109,15 @@ export async function anularVenta(form: FormData) {
   await db.$transaction(async (tx) => {
     const venta = await tx.venta.findUnique({ where: { id }, include: { items: true } });
     if (!venta || venta.estado === "ANULADA") throw new Error("La factura no existe o ya está anulada");
-    await tx.venta.update({ where: { id }, data: { estado: "ANULADA", motivoAnulacion: motivo } });
+    await tx.venta.update({
+      where: { id },
+      data: { estado: "ANULADA", motivoAnulacion: motivo, anuladaPorId: s.id, anuladaEn: new Date() },
+    });
+    await auditar(s, "VENTA_ANULADA", {
+      entidad: "Venta",
+      entidadId: id,
+      detalle: { numero: venta.numero, total: venta.total, motivo },
+    }, tx);
     for (const i of venta.items) {
       await registrarMovimiento(tx, {
         localId: venta.localId,

@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { PageHeader, EstadoBadge } from "@/components/ui";
 import { alternarUsuario, crearUsuario, guardarCategoria, guardarLocal } from "./actions";
+import Link from "next/link";
+import { History } from "lucide-react";
 
 export default async function AdminPage() {
   const s = await requireAdmin();
@@ -13,8 +15,11 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader titulo="Administración" subtitulo="Categorías y precios, locales y usuarios" />
-
+      <PageHeader titulo="Administración" subtitulo="Categorías y precios, locales y usuarios">
+        <Link href="/admin/auditoria" className="btn-secondary">
+          <History className="h-5 w-5" /> Historial de cambios
+        </Link>
+      </PageHeader>
       <section>
         <h2 className="mb-3 text-lg font-semibold">Categorías y precios sugeridos</h2>
         <div className="card overflow-x-auto">

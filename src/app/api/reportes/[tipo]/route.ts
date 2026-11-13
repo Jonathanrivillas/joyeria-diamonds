@@ -14,7 +14,10 @@ function csv(filas: (string | number | null | undefined)[][]): string {
 
 const g = (cg: number) => (cg / 100).toFixed(2).replace(".", ",");
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ tipo: string }> }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ tipo: string }> },
+) {
   const { tipo } = await params;
   const s = await getSesion();
   if (!s) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -27,15 +30,44 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tipo
   if (tipo === "ventas") {
     const items = await db.ventaItem.findMany({
       where: { venta: { ...whereLocal, fecha: { gte: desde, lte: hasta } } },
-      include: { venta: { include: { local: true, usuario: true } }, categoria: true },
+      include: {
+        venta: { include: { local: true, usuario: true } },
+        categoria: true,
+      },
       orderBy: { venta: { fecha: "asc" } },
     });
     filas = [
-      ["Factura", "Fecha", "Local", "Vendedor", "Cliente", "Pago", "Estado", "Categoría", "Descripción", "Peso (g)", "Cantidad", "Precio", "Hechura", "Subtotal"],
+      [
+        "Factura",
+        "Fecha",
+        "Local",
+        "Vendedor",
+        "Cliente",
+        "Pago",
+        "Estado",
+        "Categoría",
+        "Descripción",
+        "Peso (g)",
+        "Cantidad",
+        "Precio",
+        "Hechura",
+        "Subtotal",
+      ],
       ...items.map((i) => [
-        i.venta.numero, i.venta.fecha.toLocaleString("es-CO"), i.venta.local.nombre, i.venta.usuario.nombre,
-        i.venta.clienteNombre, i.venta.metodoPago, i.venta.estado, i.categoria.nombre, i.descripcion,
-        g(i.pesoCg), i.cantidad, i.precioGramo, i.hechura, i.subtotal,
+        i.venta.numero,
+        i.venta.fecha.toLocaleString("es-CO"),
+        i.venta.local.nombre,
+        i.venta.usuario.nombre,
+        i.venta.clienteNombre,
+        i.venta.metodoPago,
+        i.venta.estado,
+        i.categoria.nombre,
+        i.descripcion,
+        g(i.pesoCg),
+        i.cantidad,
+        i.precioGramo,
+        i.hechura,
+        i.subtotal,
       ]),
     ];
   } else if (tipo === "gastos") {
@@ -45,8 +77,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tipo
       orderBy: { fecha: "asc" },
     });
     filas = [
-      ["Fecha", "Local", "Tipo", "Justificación", "Registró", "Monto"],
-      ...gastos.map((x) => [x.fecha.toLocaleString("es-CO"), x.local.nombre, x.tipo, x.justificacion, x.usuario.nombre, x.monto]),
+      [
+        "Fecha",
+        "Local",
+        "Tipo",
+        "Justificación",
+        "Registró",
+        "Monto",
+        "Estado",
+        "Motivo anulación",
+      ],
+      ...gastos.map((x) => [
+        x.fecha.toLocaleString("es-CO"),
+        x.local.nombre,
+        x.tipo,
+        x.justificacion,
+        x.usuario.nombre,
+        x.monto,
+        x.estado,
+        x.motivoAnulacion ?? "",
+      ]),
     ];
   } else if (tipo === "inventario") {
     const ex = await db.existencia.findMany({
@@ -56,7 +106,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tipo
     });
     filas = [
       ["Local", "Categoría", "Peso (g)", "Cantidad"],
-      ...ex.map((e) => [e.local.nombre, e.categoria.nombre, g(e.pesoCg), e.cantidad]),
+      ...ex.map((e) => [
+        e.local.nombre,
+        e.categoria.nombre,
+        g(e.pesoCg),
+        e.cantidad,
+      ]),
     ];
   } else {
     return NextResponse.json({ error: "Reporte no existe" }, { status: 404 });

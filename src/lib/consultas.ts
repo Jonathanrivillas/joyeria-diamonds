@@ -78,7 +78,7 @@ export async function resumenRango(localId: number | null, desde: Date, hasta: D
       _count: true,
     }),
     db.gasto.aggregate({
-      where: { ...whereLocal, fecha: { gte: desde, lte: hasta } },
+      where: { ...whereLocal, estado: "ACTIVO", fecha: { gte: desde, lte: hasta } },
       _sum: { monto: true },
       _count: true,
     }),
