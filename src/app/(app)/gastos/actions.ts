@@ -26,6 +26,8 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   if (!TIPOS_GASTO[tipo]) return { error: "Toque el tipo de gasto." };
   if (!monto || monto <= 0) return { error: "Escriba cuánto costó." };
   if (justificacion.length < 5) return { error: "Escriba en qué se gastó la plata." };
+  if (monto > 1_000_000_000) return { error: "El valor es demasiado alto. Revise el número." };
+  if (justificacion.length > 500) return { error: "La explicación es muy larga (máximo 500 letras)." };
 
   let soporte: string | null = null;
   const archivo = form.get("soporte");

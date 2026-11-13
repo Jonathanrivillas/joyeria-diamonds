@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireSesion, localParaOperar } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/inventario";
 import { auditar } from "@/lib/auditoria";
+import { z } from "zod";
 
 function estadoDe(
   pS: number,
@@ -56,16 +57,25 @@ export async function iniciarArqueo(form: FormData) {
   redirect(`/arqueo/${arqueo.id}`);
 }
 
-export type ConteoInput = {
-  arqueoId: number;
-  observacion: string;
-  detalles: {
-    id: number;
-    pesoContadoCg: number | null;
-    cantidadContada: number | null;
-    observacion: string;
-  }[];
-};
+const ConteoSchema = z.object({
+  arqueoId: z.number().int().positive(),
+  observacion: z.string().max(500),
+  detalles: z
+    .array(
+      z.object({
+        id: z.number().int().positive(),
+        pesoContadoCg: z.number().int().min(0).max(100_000_000).nullable(),
+        cantidadContada: z.number().int().min(0).max(1_000_000).nullable(),
+        observacion: z.string().max(300),
+      }),
+    )
+    .max(500),
+});
+
+export type ConteoInput = z.infer<typeof ConteoSchema>;
+
+const ERROR_CONTEO =
+  "Los datos del conteo no son válidos. Recargue la página e intente de nuevo.";
 
 async function guardar(
   s: { id: number; rol: string; localId: number | null },
@@ -113,6 +123,9 @@ export async function guardarConteo(
   input: ConteoInput,
 ): Promise<{ error?: string; ok?: string }> {
   const s = await requireSesion();
+  const r = ConteoSchema.safeParse(input);
+  if (!r.success) return { error: ERROR_CONTEO };
+  input = r.data;
   try {
     await guardar(s, input);
   } catch (e) {
@@ -127,6 +140,9 @@ export async function cerrarArqueo(
   aplicarAjustes: boolean,
 ): Promise<{ error?: string }> {
   const s = await requireSesion();
+  const r = ConteoSchema.safeParse(input);
+  if (!r.success) return { error: ERROR_CONTEO };
+  input = r.data;
   if (aplicarAjustes && s.rol !== "ADMIN")
     return {
       error: "Solo el administrador puede aplicar ajustes al inventario",

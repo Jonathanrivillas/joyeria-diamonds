@@ -11,10 +11,10 @@ import { auditar } from "@/lib/auditoria";
 const ItemSchema = z.object({
   categoriaId: z.number().int().positive(),
   descripcion: z.string().max(120).default(""),
-  pesoCg: z.number().int().min(0),
-  cantidad: z.number().int().positive(),
-  precioGramo: z.number().int().min(0),
-  hechura: z.number().int().min(0).default(0),
+  pesoCg: z.number().int().min(0).max(10_000_000), // hasta 100 kg
+  cantidad: z.number().int().positive().max(10_000),
+  precioGramo: z.number().int().min(0).max(100_000_000),
+  hechura: z.number().int().min(0).max(100_000_000).default(0),
 });
 
 const VentaSchema = z.object({
@@ -22,7 +22,7 @@ const VentaSchema = z.object({
   clienteNombre: z.string().max(120).optional(),
   clienteDocumento: z.string().max(40).optional(),
   metodoPago: z.enum(["EFECTIVO", "TRANSFERENCIA", "TARJETA"]),
-  items: z.array(ItemSchema).min(1, "Agrega al menos un ítem"),
+  items: z.array(ItemSchema).min(1, "Agregue al menos una pieza").max(100),
 });
 
 export type NuevaVentaInput = z.infer<typeof VentaSchema>;
@@ -53,6 +53,7 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
   });
   if (items.some((i) => i.controlaPeso && i.pesoCg <= 0)) return { error: "Indica el peso de cada pieza" };
   const total = items.reduce((a, i) => a + i.subtotal, 0);
+  if (total > 2_000_000_000) return { error: "El total es demasiado alto. Revise el peso y el precio." };
 
   try {
     const venta = await db.$transaction(async (tx) => {

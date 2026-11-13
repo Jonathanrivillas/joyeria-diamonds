@@ -2,6 +2,7 @@
 
 import { auditar } from "@/lib/auditoria";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -79,7 +80,8 @@ export async function crearUsuario(form: FormData) {
   const password = String(form.get("password") || "");
   const rol = form.get("rol") === "ADMIN" ? "ADMIN" : "VENDEDOR";
   const localId = rol === "ADMIN" ? null : Number(form.get("localId")) || null;
-  if (!nombre || !email || password.length < 8) return;
+  if (!nombre || nombre.length > 100 || password.length < 8 || password.length > 200) return;
+  if (!z.email().safeParse(email).success) return;
   const existia = await db.usuario.findUnique({
     where: { email },
     select: { rol: true, localId: true },

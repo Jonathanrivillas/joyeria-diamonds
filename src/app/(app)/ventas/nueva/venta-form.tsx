@@ -458,6 +458,10 @@ export function VentaForm({
                   <label className="label">Cédula</label>
                   <input className="input" inputMode="numeric" value={documento} onChange={(e) => setDocumento(e.target.value)} />
                 </div>
+                <p className="ayuda sm:col-span-2">
+                  El nombre y la cédula solo se usan para la factura de esta venta (Ley 1581 de 2012).
+                  Pregúntele al cliente si está de acuerdo.
+                </p>
               </div>
             )}
           </div>

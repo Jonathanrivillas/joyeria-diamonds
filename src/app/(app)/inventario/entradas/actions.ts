@@ -32,6 +32,10 @@ export async function registrarEntrada(
     return { error: "Escriba cuánto pesa lo que llegó." };
   if (!Number.isInteger(cantidad) || cantidad <= 0)
     return { error: "Escriba cuántas piezas son." };
+  if (pesoCg > 100_000_000 || cantidad > 100_000)
+    return { error: "El número es demasiado alto. Revíselo." };
+  if (nota.length > 300)
+    return { error: "La nota es muy larga (máximo 300 letras)." };
 
   await db.$transaction(async (tx) => {
     await registrarMovimiento(tx, {
