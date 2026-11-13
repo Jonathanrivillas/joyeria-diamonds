@@ -1,0 +1,192 @@
+// Inventario por gramos para joyería.
+// Pesos en centésimas de gramo (Int) y dinero en pesos COP (Int) para evitar errores de redondeo.
+// Para pasar a PostgreSQL: cambiar provider y DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Local {
+  id             Int          @id @default(autoincrement())
+  nombre         String
+  direccion      String       @default("")
+  prefijoFactura String       @unique
+  consecutivo    Int          @default(0)
+  usuarios       Usuario[]
+  existencias    Existencia[]
+  movimientos    Movimiento[]
+  ventas         Venta[]
+  gastos         Gasto[]
+  arqueos        Arqueo[]
+  trasladosSalida  Traslado[] @relation("origen")
+  trasladosEntrada Traslado[] @relation("destino")
+}
+
+model Usuario {
+  id           Int          @id @default(autoincrement())
+  nombre       String
+  email        String       @unique
+  passwordHash String
+  rol          String // ADMIN | VENDEDOR
+  activo       Boolean      @default(true)
+  localId      Int?
+  local        Local?       @relation(fields: [localId], references: [id])
+  movimientos  Movimiento[]
+  ventas       Venta[]
+  gastos       Gasto[]
+  arqueos      Arqueo[]
+  traslados    Traslado[]
+}
+
+model Categoria {
+  id                  Int             @id @default(autoincrement())
+  nombre              String          @unique
+  orden               Int             @default(0)
+  controlaPeso        Boolean         @default(true)
+  precioGramoSugerido Int             @default(0) // COP por gramo
+  precioUnidadSugerido Int            @default(0) // COP por pieza (categorías sin peso)
+  activa              Boolean         @default(true)
+  existencias         Existencia[]
+  movimientos         Movimiento[]
+  ventaItems          VentaItem[]
+  arqueoDetalles      ArqueoDetalle[]
+  trasladoItems       TrasladoItem[]
+}
+
+model Existencia {
+  id          Int       @id @default(autoincrement())
+  localId     Int
+  categoriaId Int
+  pesoCg      Int       @default(0)
+  cantidad    Int       @default(0)
+  local       Local     @relation(fields: [localId], references: [id])
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  @@unique([localId, categoriaId])
+}
+
+model Movimiento {
+  id          Int       @id @default(autoincrement())
+  fecha       DateTime  @default(now())
+  tipo        String // ENTRADA | VENTA | ANULACION | TRASLADO_SALIDA | TRASLADO_ENTRADA | AJUSTE_ARQUEO
+  pesoCg      Int // con signo: + entra, - sale
+  cantidad    Int // con signo
+  referencia  String?
+  nota        String?
+  localId     Int
+  categoriaId Int
+  usuarioId   Int
+  local       Local     @relation(fields: [localId], references: [id])
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@index([localId, fecha])
+  @@index([categoriaId, fecha])
+}
+
+model Venta {
+  id              Int         @id @default(autoincrement())
+  numero          String      @unique
+  fecha           DateTime    @default(now())
+  clienteNombre   String?
+  clienteDocumento String?
+  metodoPago      String // EFECTIVO | TRANSFERENCIA | TARJETA
+  total           Int
+  estado          String      @default("ACTIVA") // ACTIVA | ANULADA
+  motivoAnulacion String?
+  localId         Int
+  usuarioId       Int
+  local           Local       @relation(fields: [localId], references: [id])
+  usuario         Usuario     @relation(fields: [usuarioId], references: [id])
+  items           VentaItem[]
+
+  @@index([localId, fecha])
+}
+
+model VentaItem {
+  id          Int       @id @default(autoincrement())
+  ventaId     Int
+  categoriaId Int
+  descripcion String    @default("")
+  pesoCg      Int
+  cantidad    Int
+  precioGramo Int
+  hechura     Int       @default(0)
+  subtotal    Int
+  venta       Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+}
+
+model Gasto {
+  id            Int      @id @default(autoincrement())
+  fecha         DateTime @default(now())
+  tipo          String // NOMINA | ARRIENDO | SERVICIOS | INSUMOS | OTROS
+  monto         Int
+  justificacion String
+  soporte       String?
+  localId       Int
+  usuarioId     Int
+  local         Local    @relation(fields: [localId], references: [id])
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([localId, fecha])
+}
+
+model Arqueo {
+  id               Int             @id @default(autoincrement())
+  fecha            DateTime        @default(now())
+  estado           String          @default("ABIERTO") // ABIERTO | CERRADO
+  pesoSistemaCg    Int             @default(0)
+  pesoContadoCg    Int             @default(0)
+  ajustesAplicados Boolean         @default(false)
+  observacion      String?
+  localId          Int
+  usuarioId        Int
+  local            Local           @relation(fields: [localId], references: [id])
+  usuario          Usuario         @relation(fields: [usuarioId], references: [id])
+  detalles         ArqueoDetalle[]
+
+  @@index([localId, fecha])
+}
+
+model ArqueoDetalle {
+  id               Int       @id @default(autoincrement())
+  arqueoId         Int
+  categoriaId      Int
+  pesoSistemaCg    Int
+  cantidadSistema  Int
+  pesoContadoCg    Int?
+  cantidadContada  Int?
+  estado           String? // OK | SOBRA | FALTA
+  observacion      String?
+  arqueo           Arqueo    @relation(fields: [arqueoId], references: [id], onDelete: Cascade)
+  categoria        Categoria @relation(fields: [categoriaId], references: [id])
+}
+
+model Traslado {
+  id        Int            @id @default(autoincrement())
+  fecha     DateTime       @default(now())
+  nota      String?
+  origenId  Int
+  destinoId Int
+  usuarioId Int
+  origen    Local          @relation("origen", fields: [origenId], references: [id])
+  destino   Local          @relation("destino", fields: [destinoId], references: [id])
+  usuario   Usuario        @relation(fields: [usuarioId], references: [id])
+  items     TrasladoItem[]
+}
+
+model TrasladoItem {
+  id          Int       @id @default(autoincrement())
+  trasladoId  Int
+  categoriaId Int
+  pesoCg      Int
+  cantidad    Int
+  traslado    Traslado  @relation(fields: [trasladoId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+}

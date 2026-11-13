@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pensado para personas mayores: letra grande, alto contraste, áreas de toque amplias. */
+@layer base {
+  html {
+    font-size: 95.25%; /* 17px: todo el sistema escala en proporción */
+  }
+  body {
+    @apply bg-stone-100 text-stone-900 antialiased;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    @apply outline-none ring-4 ring-oro-300;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-stone-200 bg-white shadow-sm;
+  }
+  .btn {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl px-4 py-2 text-base font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-oro-700 text-white shadow-sm hover:bg-oro-800;
+  }
+  .btn-secondary {
+    @apply btn border-2 border-stone-300 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50;
+  }
+  .btn-danger {
+    @apply btn bg-red-700 text-white hover:bg-red-800;
+  }
+  .btn-grande {
+    @apply min-h-[3.25rem] px-5 text-lg;
+  }
+  .input {
+    @apply min-h-[2.75rem] w-full rounded-xl border-2 border-stone-300 bg-white px-3.5 py-2 text-base text-stone-900 outline-none placeholder:text-stone-400 focus:border-oro-600 focus:ring-4 focus:ring-oro-100 disabled:bg-stone-100 disabled:text-stone-400;
+  }
+  .label {
+    @apply mb-1.5 block text-base font-semibold text-stone-700;
+  }
+  .ayuda {
+    @apply mt-1 text-sm text-stone-500;
+  }
+  .tabla {
+    @apply w-full text-base;
+  }
+  .tabla th {
+    @apply border-b-2 border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm font-semibold text-stone-600;
+  }
+  .tabla td {
+    @apply border-b border-stone-100 px-4 py-3;
+  }
+  .tabla tbody tr:hover {
+    @apply bg-oro-50/60;
+  }
+  .num {
+    @apply text-right tabular-nums;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html {
+    font-size: 100%;
+  }
+  body {
+    background: white;
+  }
+  main {
+    padding: 0 !important;
+  }
+}
