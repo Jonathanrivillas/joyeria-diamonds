@@ -45,3 +45,29 @@ jobs:
           path: respaldo-*.dump.gpg
           retention-days: 30
           if-no-files-found: error
+
+      - name: Probar que la copia se puede restaurar
+        env:
+          CLAVE: ${{ secrets.RESPALDO_CLAVE }}
+          URL_BD: ${{ secrets.RESPALDO_DATABASE_URL }}
+          URL_PRUEBA: ${{ secrets.RESPALDO_PRUEBA_URL }}
+        run: |
+          BIN=/usr/lib/postgresql/18/bin
+          gpg --batch --pinentry-mode loopback --passphrase "$CLAVE" \
+              --decrypt --output prueba.dump respaldo-*.dump.gpg
+          $BIN/pg_restore --clean --if-exists --no-owner --no-privileges \
+              -d "$URL_PRUEBA" prueba.dump || echo "pg_restore terminó con advertencias"
+          shred -u prueba.dump
+
+          FALLA=0
+          for T in Usuario Local Categoria Existencia Venta VentaItem Movimiento Gasto Arqueo Auditoria; do
+            O=$($BIN/psql "$URL_BD" -tAc "select count(*) from \"$T\"")
+            C=$($BIN/psql "$URL_PRUEBA" -tAc "select count(*) from \"$T\"")
+            echo "$T: producción $O · copia $C"
+            [ "$O" = "$C" ] || FALLA=1
+          done
+          if [ "$FALLA" = "1" ]; then
+            echo "::error::La copia restaurada NO coincide con producción"
+            exit 1
+          fi
+          echo "✓ La copia se restauró completa y coincide con producción"
