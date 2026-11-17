@@ -1,4 +1,4 @@
-import { History, Palette, Plus, Save, UserPlus } from "lucide-react";
+import { History, Plus, Save, UserPlus } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { Button, Card, CardHeader, Checkbox, Input, PageContainer, PageHeader, PasswordInput, Section, Select, StatusBadge, Table, Td, Th, Tr } from "@/components/ui";
@@ -18,14 +18,9 @@ export default async function AdminPage() {
         title="Administración"
         subtitle="Categorías y precios, locales y usuarios"
         actions={
-          <>
-            <Button variant="secondary" href="/admin/componentes" icon={Palette}>
-              Sistema de diseño
-            </Button>
-            <Button variant="secondary" href="/admin/auditoria" icon={History}>
-              Historial de cambios
-            </Button>
-          </>
+          <Button variant="secondary" href="/admin/auditoria" icon={History}>
+            Historial de cambios
+          </Button>
         }
       />
 

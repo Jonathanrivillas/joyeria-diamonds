@@ -3,7 +3,6 @@
  *
  * Importe siempre desde "@/components/ui": las vistas no deben definir botones,
  * tarjetas, campos ni colores propios. Si algo no existe aquí, agréguelo aquí.
- * Vea todos los componentes en vivo en /admin/componentes.
  */
 export { cn } from "./cn";
 export type { Tone } from "./tones";
