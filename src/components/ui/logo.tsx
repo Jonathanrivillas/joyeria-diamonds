@@ -32,3 +32,31 @@ export function Logo({
     />
   );
 }
+
+/** Proporción del archivo public/nombre-diamonds.png (2172 × 300). */
+const NOMBRE_ANCHO = 2172;
+const NOMBRE_ALTO = 300;
+
+/**
+ * Nombre de la joyería en letras plateadas ("DIAMONDS"). Fondo transparente:
+ * pensado para fondos oscuros como el menú lateral.
+ */
+export function LogoNombre({
+  priority,
+  className,
+}: {
+  /** Cárguelo de primero cuando está arriba en la pantalla (menú, login). */
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <Image
+      src="/nombre-diamonds.png"
+      alt="Joyería Diamonds"
+      width={NOMBRE_ANCHO}
+      height={NOMBRE_ALTO}
+      priority={priority}
+      className={cn("h-auto w-full max-w-36 select-none", className)}
+    />
+  );
+}

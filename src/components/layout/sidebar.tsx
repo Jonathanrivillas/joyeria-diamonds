@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { Button, Icon, Logo, cn } from "@/components/ui";
+import { Button, Icon, Logo, LogoNombre, cn } from "@/components/ui";
 import { OTROS, PRINCIPALES, esActivo, type Modulo } from "./navegacion";
 
 function Enlace({ m, activo }: { m: Modulo; activo: boolean }) {
@@ -30,8 +30,8 @@ export function Marca() {
   return (
     <div className="flex items-center gap-3 px-5 py-6">
       <Logo size="md" priority />
-      <div>
-        <p className="text-lg font-bold text-white">Joyería Diamonds</p>
+      <div className="min-w-0 flex-1">
+        <LogoNombre priority />
       </div>
     </div>
   );
