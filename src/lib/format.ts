@@ -1,5 +1,7 @@
 // Pesos se guardan en centésimas de gramo (cg). Dinero en pesos COP enteros.
 
+import { ZONA_HORARIA, horaColombia, inicioDia, sumarDias } from "./fechas";
+
 const nfGramos = new Intl.NumberFormat("es-CO", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -46,10 +48,12 @@ export function parseCOP(texto: string | null | undefined): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
+// Todas las fechas se muestran en hora de Colombia, aunque el servidor esté en otra zona.
 const fmtFecha = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
   month: "short",
   year: "numeric",
+  timeZone: ZONA_HORARIA,
 });
 const fmtFechaHora = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
@@ -57,14 +61,16 @@ const fmtFechaHora = new Intl.DateTimeFormat("es-CO", {
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 const fmtFechaLarga = new Intl.DateTimeFormat("es-CO", {
   weekday: "long",
   day: "numeric",
   month: "long",
+  timeZone: ZONA_HORARIA,
 });
-const fmtHora = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" });
+const fmtHora = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", timeZone: ZONA_HORARIA });
 
 /** "jueves, 12 de noviembre" */
 export function fechaLarga(d: Date): string {
@@ -78,17 +84,15 @@ export function hora(d: Date): string {
 
 /** "Hoy 3:20 p. m." / "Ayer 10:05 a. m." / "05 nov 2026" */
 export function cuando(d: Date): string {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const ayer = new Date(hoy);
-  ayer.setDate(ayer.getDate() - 1);
+  const hoy = inicioDia(new Date());
+  const ayer = sumarDias(hoy, -1);
   if (d >= hoy) return `Hoy ${hora(d)}`;
   if (d >= ayer) return `Ayer ${hora(d)}`;
   return fechaHora(d);
 }
 
 export function saludo(d = new Date()): string {
-  const h = d.getHours();
+  const h = horaColombia(d);
   return h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
 }
 

@@ -45,6 +45,25 @@ export async function requireAdmin(): Promise<Sesion> {
 }
 
 /**
+ * Cuenta de soporte técnico (el desarrollador): la única que ve y cambia la
+ * configuración que casi nunca se toca (tipos de pieza y locales). Se define con
+ * la variable SOPORTE_EMAILS (correos separados por coma).
+ */
+export function esSoporte(s: Sesion): boolean {
+  const correos = (process.env.SOPORTE_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return s.rol === "ADMIN" && correos.includes(s.email.toLowerCase());
+}
+
+export async function requireSoporte(): Promise<Sesion> {
+  const s = await requireAdmin();
+  if (!esSoporte(s)) redirect("/admin");
+  return s;
+}
+
+/**
  * Local sobre el que trabaja la vista:
  * - Vendedor: siempre su local.
  * - Admin: el elegido en el selector (null = todos los locales).

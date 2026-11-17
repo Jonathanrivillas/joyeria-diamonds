@@ -1,11 +1,33 @@
 import { History, Plus, Save, UserPlus } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
-import { Button, Card, CardHeader, Checkbox, Input, PageContainer, PageHeader, PasswordInput, Section, Select, StatusBadge, Table, Td, Th, Tr } from "@/components/ui";
-import { alternarUsuario, crearUsuario, guardarCategoria, guardarLocal } from "./actions";
+import { esSoporte, requireAdmin } from "@/lib/session";
+import {
+  Button,
+  Card,
+  CardHeader,
+  Checkbox,
+  Input,
+  PageContainer,
+  PageHeader,
+  PasswordInput,
+  Section,
+  Select,
+  StatusBadge,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "@/components/ui";
+import {
+  alternarUsuario,
+  crearUsuario,
+  guardarCategoria,
+  guardarLocal,
+} from "./actions";
 
 export default async function AdminPage() {
   const s = await requireAdmin();
+  const soporte = esSoporte(s);
   const [categorias, locales, usuarios] = await Promise.all([
     db.categoria.findMany({ orderBy: { orden: "asc" } }),
     db.local.findMany({ orderBy: { id: "asc" } }),
@@ -16,7 +38,11 @@ export default async function AdminPage() {
     <PageContainer className="space-y-8">
       <PageHeader
         title="Administración"
-        subtitle="Categorías y precios, locales y usuarios"
+        subtitle={
+          soporte
+            ? "Usuarios, tipos de pieza y locales"
+            : "Las personas que usan el sistema"
+        }
         actions={
           <Button variant="secondary" href="/admin/auditoria" icon={History}>
             Historial de cambios
@@ -24,71 +50,97 @@ export default async function AdminPage() {
         }
       />
 
-      <Section title="Categorías y precios sugeridos">
-        <Card>
-          <Table>
-            <thead>
-              <tr>
-                <Th colSpan={6} className="!p-0">
-                  <div className="grid min-w-[52rem] grid-cols-[1.5fr_0.8fr_1fr_1fr_0.5fr_8rem] gap-3 px-4 py-3">
-                    <span>Nombre</span>
-                    <span>Controla peso</span>
-                    <span>Precio por gramo</span>
-                    <span>Precio por unidad</span>
-                    <span>Activa</span>
-                    <span />
-                  </div>
-                </Th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...categorias, null].map((c) => (
-                <tr key={c?.id ?? "nueva"}>
-                  <Td colSpan={6} className="!p-0">
-                    <form action={guardarCategoria} className="grid min-w-[52rem] grid-cols-[1.5fr_0.8fr_1fr_1fr_0.5fr_8rem] items-center gap-3 px-4 py-2">
-                      <input type="hidden" name="id" value={c?.id ?? ""} />
-                      <Input label="Nombre" hideLabel name="nombre" defaultValue={c?.nombre ?? ""} placeholder="Nueva categoría..." />
-                      <Checkbox label="Controla peso" hideLabel name="controlaPeso" defaultChecked={c?.controlaPeso ?? true} />
-                      <Input label="Precio por gramo" hideLabel name="precioGramo" numeric defaultValue={c?.precioGramoSugerido ?? ""} placeholder="COP / g" />
-                      <Input label="Precio por unidad" hideLabel name="precioUnidad" numeric defaultValue={c?.precioUnidadSugerido ?? ""} placeholder="COP / und" />
-                      <Checkbox label="Activa" hideLabel name="activa" defaultChecked={c?.activa ?? true} />
-                      <Button type="submit" variant={c ? "secondary" : "primary"} icon={c ? Save : Plus}>
-                        {c ? "Guardar" : "Agregar"}
-                      </Button>
-                    </form>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Card>
-      </Section>
+      {soporte && (
+        <>
+          <Section
+            title="Tipos de pieza (solo soporte)"
+            description="Todo se vende por gramos al precio del día que la administradora pone en el inicio. Aquí solo se cambia el nombre o se deja de vender un tipo de pieza."
+          >
+            <Card>
+              <div className="divide-y divide-neutral-100 overflow-x-auto">
+                {[...categorias, null].map((c) => (
+                  <form
+                    key={c?.id ?? "nueva"}
+                    action={guardarCategoria}
+                    className="grid min-w-[32rem] grid-cols-[1fr_11rem_8rem] items-center gap-3 px-4 py-2"
+                  >
+                    <input type="hidden" name="id" value={c?.id ?? ""} />
+                    <Input
+                      label="Nombre"
+                      hideLabel
+                      name="nombre"
+                      defaultValue={c?.nombre ?? ""}
+                      placeholder="Nuevo tipo de pieza..."
+                    />
+                    {c ? (
+                      <Checkbox
+                        label="Se sigue vendiendo"
+                        name="activa"
+                        defaultChecked={c.activa}
+                      />
+                    ) : (
+                      <span />
+                    )}
+                    <Button
+                      type="submit"
+                      variant={c ? "secondary" : "primary"}
+                      icon={c ? Save : Plus}
+                    >
+                      {c ? "Guardar" : "Agregar"}
+                    </Button>
+                  </form>
+                ))}
+              </div>
+            </Card>
+          </Section>
 
-      <Section title="Locales">
-        <Card>
-          <div className="divide-y divide-neutral-100 overflow-x-auto">
-            {[...locales, null].map((l) => (
-              <form key={l?.id ?? "nuevo"} action={guardarLocal} className="grid min-w-[40rem] grid-cols-[1fr_1.5fr_8rem_8rem] items-center gap-3 px-4 py-3">
-                <input type="hidden" name="id" value={l?.id ?? ""} />
-                <Input label="Nombre del local" hideLabel name="nombre" defaultValue={l?.nombre ?? ""} placeholder="Nombre del nuevo local" />
-                <Input label="Dirección" hideLabel name="direccion" defaultValue={l?.direccion ?? ""} placeholder="Dirección" />
-                <Input
-                  label="Prefijo de factura"
-                  hideLabel
-                  name="prefijo"
-                  defaultValue={l?.prefijoFactura ?? ""}
-                  placeholder="Prefijo"
-                  disabled={!!l}
-                  title="Prefijo de factura"
-                />
-                <Button type="submit" variant={l ? "secondary" : "primary"} icon={l ? Save : Plus}>
-                  {l ? "Guardar" : "Agregar"}
-                </Button>
-              </form>
-            ))}
-          </div>
-        </Card>
-      </Section>
+          <Section title="Locales (solo soporte)">
+            <Card>
+              <div className="divide-y divide-neutral-100 overflow-x-auto">
+                {[...locales, null].map((l) => (
+                  <form
+                    key={l?.id ?? "nuevo"}
+                    action={guardarLocal}
+                    className="grid min-w-[40rem] grid-cols-[1fr_1.5fr_8rem_8rem] items-center gap-3 px-4 py-3"
+                  >
+                    <input type="hidden" name="id" value={l?.id ?? ""} />
+                    <Input
+                      label="Nombre del local"
+                      hideLabel
+                      name="nombre"
+                      defaultValue={l?.nombre ?? ""}
+                      placeholder="Nombre del nuevo local"
+                    />
+                    <Input
+                      label="Dirección"
+                      hideLabel
+                      name="direccion"
+                      defaultValue={l?.direccion ?? ""}
+                      placeholder="Dirección"
+                    />
+                    <Input
+                      label="Prefijo de factura"
+                      hideLabel
+                      name="prefijo"
+                      defaultValue={l?.prefijoFactura ?? ""}
+                      placeholder="Prefijo"
+                      disabled={!!l}
+                      title="Prefijo de factura"
+                    />
+                    <Button
+                      type="submit"
+                      variant={l ? "secondary" : "primary"}
+                      icon={l ? Save : Plus}
+                    >
+                      {l ? "Guardar" : "Agregar"}
+                    </Button>
+                  </form>
+                ))}
+              </div>
+            </Card>
+          </Section>
+        </>
+      )}
 
       <Section title="Usuarios">
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -112,13 +164,19 @@ export default async function AdminPage() {
                     <Td>{u.rol === "ADMIN" ? "Administrador" : "Vendedor"}</Td>
                     <Td>{u.local?.nombre ?? "Todos"}</Td>
                     <Td>
-                      <StatusBadge status={u.activo ? "HABILITADO" : "INACTIVO"} />
+                      <StatusBadge
+                        status={u.activo ? "HABILITADO" : "INACTIVO"}
+                      />
                     </Td>
                     <Td>
                       {u.id !== s.id && (
                         <form action={alternarUsuario}>
                           <input type="hidden" name="id" value={u.id} />
-                          <Button type="submit" size="sm" variant={u.activo ? "danger-outline" : "secondary"}>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant={u.activo ? "danger-outline" : "secondary"}
+                          >
                             {u.activo ? "Desactivar" : "Activar"}
                           </Button>
                         </form>
@@ -133,8 +191,20 @@ export default async function AdminPage() {
             <CardHeader title="Crear usuario" icon={UserPlus} />
             <form action={crearUsuario} className="space-y-4 p-5">
               <Input label="Nombre" name="nombre" required />
-              <Input label="Correo" name="email" type="email" placeholder="correo@joyeria.com" required />
-              <PasswordInput label="Contraseña temporal" name="password" minLength={8} required hint="Mínimo 8 caracteres. Se le pedirá cambiarla al entrar." />
+              <Input
+                label="Correo"
+                name="email"
+                type="email"
+                placeholder="correo@joyeria.com"
+                required
+              />
+              <PasswordInput
+                label="Contraseña temporal"
+                name="password"
+                minLength={8}
+                required
+                hint="Mínimo 8 caracteres. Se le pedirá cambiarla al entrar."
+              />
               <div className="grid grid-cols-2 gap-3">
                 <Select
                   label="Rol"
@@ -144,7 +214,14 @@ export default async function AdminPage() {
                     { value: "ADMIN", label: "Administrador" },
                   ]}
                 />
-                <Select label="Local" name="localId" options={locales.map((l) => ({ value: l.id, label: l.nombre }))} />
+                <Select
+                  label="Local"
+                  name="localId"
+                  options={locales.map((l) => ({
+                    value: l.id,
+                    label: l.nombre,
+                  }))}
+                />
               </div>
               <Button type="submit" block icon={UserPlus}>
                 Crear

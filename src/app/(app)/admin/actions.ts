@@ -5,21 +5,20 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
-import { parseCOP } from "@/lib/format";
+import { requireAdmin, requireSoporte } from "@/lib/session";
 
+/**
+ * Tipos de pieza (solo soporte). Todo se vende por gramos al precio del día,
+ * así que aquí solo se maneja el nombre y si todavía se vende.
+ */
 export async function guardarCategoria(form: FormData) {
-  const s = await requireAdmin();
+  const s = await requireSoporte();
   const id = Number(form.get("id"));
   const data = {
     nombre: String(form.get("nombre") || "").trim(),
-    controlaPeso: form.get("controlaPeso") === "on",
-    precioGramoSugerido: parseCOP(String(form.get("precioGramo") || "0")) || 0,
-    precioUnidadSugerido:
-      parseCOP(String(form.get("precioUnidad") || "0")) || 0,
     activa: form.get("activa") === "on",
   };
-  if (!data.nombre) return;
+  if (!data.nombre || data.nombre.length > 60) return;
   if (id) {
     const antes = await db.categoria.findUnique({ where: { id } });
     await db.categoria.update({ where: { id }, data });
@@ -27,20 +26,19 @@ export async function guardarCategoria(form: FormData) {
       entidad: "Categoria",
       entidadId: id,
       detalle: {
-        antes: antes && {
-          nombre: antes.nombre,
-          controlaPeso: antes.controlaPeso,
-          precioGramoSugerido: antes.precioGramoSugerido,
-          precioUnidadSugerido: antes.precioUnidadSugerido,
-          activa: antes.activa,
-        },
+        antes: antes && { nombre: antes.nombre, activa: antes.activa },
         despues: data,
       },
     });
   } else {
     const max = await db.categoria.aggregate({ _max: { orden: true } });
     const nueva = await db.categoria.create({
-      data: { ...data, activa: true, orden: (max._max.orden ?? 0) + 1 },
+      data: {
+        ...data,
+        controlaPeso: true,
+        activa: true,
+        orden: (max._max.orden ?? 0) + 1,
+      },
     });
     await auditar(s, "CATEGORIA_CREADA", {
       entidad: "Categoria",
@@ -51,15 +49,18 @@ export async function guardarCategoria(form: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** Locales (solo soporte). El prefijo de factura no se puede cambiar después de creado. */
 export async function guardarLocal(form: FormData) {
-  const s = await requireAdmin();
+  const s = await requireSoporte();
   const id = Number(form.get("id"));
   const nombre = String(form.get("nombre") || "").trim();
   const direccion = String(form.get("direccion") || "").trim();
   const prefijoFactura = String(form.get("prefijo") || "")
     .trim()
     .toUpperCase();
-  if (!nombre || !prefijoFactura) return;
+  // Al editar, el campo del prefijo va deshabilitado y no se envía: solo es obligatorio al crear.
+  if (!nombre || nombre.length > 80 || direccion.length > 200) return;
+  if (!id && !/^[A-Z0-9]{1,6}$/.test(prefijoFactura)) return;
   const local = id
     ? await db.local.update({ where: { id }, data: { nombre, direccion } })
     : await db.local.create({ data: { nombre, direccion, prefijoFactura } });
@@ -80,7 +81,13 @@ export async function crearUsuario(form: FormData) {
   const password = String(form.get("password") || "");
   const rol = form.get("rol") === "ADMIN" ? "ADMIN" : "VENDEDOR";
   const localId = rol === "ADMIN" ? null : Number(form.get("localId")) || null;
-  if (!nombre || nombre.length > 100 || password.length < 8 || password.length > 200) return;
+  if (
+    !nombre ||
+    nombre.length > 100 ||
+    password.length < 8 ||
+    password.length > 200
+  )
+    return;
   if (!z.email().safeParse(email).success) return;
   const existia = await db.usuario.findUnique({
     where: { email },

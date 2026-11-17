@@ -63,6 +63,7 @@ async function main() {
   await db.gasto.deleteMany();
   await db.movimiento.deleteMany();
   await db.existencia.deleteMany();
+  await db.precioGramo.deleteMany();
   await db.usuario.deleteMany();
   await db.categoria.deleteMany();
   await db.local.deleteMany();
@@ -98,6 +99,12 @@ async function main() {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const DIAS = 30;
+
+  // Precio del gramo: el de ayer, para que al entrar como administrador se pregunte el de hoy.
+  const ayer = new Date(hoy);
+  ayer.setDate(ayer.getDate() - 1);
+  ayer.setHours(8, 30, 0, 0);
+  await db.precioGramo.create({ data: { valor: 380000, usuarioId: admin.id, fecha: ayer } });
   const diaN = (n: number, h: number, m = 0) => {
     const d = new Date(hoy);
     d.setDate(d.getDate() - n);

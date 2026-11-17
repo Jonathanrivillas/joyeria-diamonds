@@ -3,7 +3,7 @@ import { BarChart3, Download } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { resumenRango } from "@/lib/consultas";
-import { aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
+import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
 import { cop, gramos, fecha, fechaLarga, METODOS_PAGO, TIPOS_GASTO, plural } from "@/lib/format";
 import { rangoActivo, rangosRapidos } from "@/lib/rangos";
 import {
@@ -73,7 +73,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
     const d = sumarDias(gDesde, i);
     const f = finDia(d);
     return {
-      dia: d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" }),
+      dia: d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", timeZone: ZONA_HORARIA }),
       fechaD: d,
       ventas: ventasRango.filter((v) => v.fecha >= d && v.fecha <= f).reduce((a, v) => a + v.total, 0),
       gastos: gastosRango.filter((g) => g.fecha >= d && g.fecha <= f).reduce((a, g) => a + g.monto, 0),

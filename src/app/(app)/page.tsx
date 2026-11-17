@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { resumenRango } from "@/lib/consultas";
 import { finDia, inicioDia } from "@/lib/fechas";
-import { cop, gramos, entero, fechaLarga, plural, saludo } from "@/lib/format";
+import { cop, cuando, gramos, entero, fechaLarga, plural, saludo } from "@/lib/format";
+import { precioDelDia } from "@/lib/precio";
+import { PrecioDelDia } from "@/components/precio/precio-del-dia";
 import { Button, Card, CardHeader, CardLink, Icon, List, PageContainer, PageHeader, Section, Stat, StatPanel } from "@/components/ui";
 import { MODULOS } from "@/components/layout/navegacion";
 import { ArqueoHoyResumen } from "@/components/arqueo/arqueo-estado";
@@ -29,7 +31,8 @@ export default async function InicioPage() {
   const whereLocal = localId ? { localId } : {};
   const localesVista = localId ? locales.filter((l) => l.id === localId) : locales;
 
-  const [res, stock, arqueos, ventasHoy] = await Promise.all([
+  const [precio, res, stock, arqueos, ventasHoy] = await Promise.all([
+    precioDelDia(),
     resumenRango(localId, hoy, finDia(hoy)),
     db.existencia.aggregate({ where: whereLocal, _sum: { pesoCg: true, cantidad: true } }),
     db.arqueo.findMany({
@@ -65,7 +68,13 @@ export default async function InicioPage() {
         }
       />
 
-      {/* Lo pendiente va primero. */}
+      {/* Lo pendiente va primero: el precio del gramo de hoy y el arqueo. */}
+      <PrecioDelDia
+        valor={precio.valor}
+        confirmadoHoy={precio.confirmadoHoy}
+        ultimaVez={precio.fecha ? cuando(precio.fecha) : null}
+        puedeCambiar={s.rol === "ADMIN"}
+      />
       <ArqueoHoyResumen locales={arqueoPorLocal} />
 
       <Section title="Resumen de hoy">

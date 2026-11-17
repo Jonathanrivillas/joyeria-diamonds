@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSesion, getAlcance } from "@/lib/session";
-import { aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
+import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
 
 function csv(filas: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
@@ -57,7 +57,7 @@ export async function GET(
       ],
       ...items.map((i) => [
         i.venta.numero,
-        i.venta.fecha.toLocaleString("es-CO"),
+        i.venta.fecha.toLocaleString("es-CO", { timeZone: ZONA_HORARIA }),
         i.venta.local.nombre,
         i.venta.usuario.nombre,
         i.venta.clienteNombre,
@@ -90,7 +90,7 @@ export async function GET(
         "Motivo anulación",
       ],
       ...gastos.map((x) => [
-        x.fecha.toLocaleString("es-CO"),
+        x.fecha.toLocaleString("es-CO", { timeZone: ZONA_HORARIA }),
         x.local.nombre,
         x.tipo,
         x.justificacion,

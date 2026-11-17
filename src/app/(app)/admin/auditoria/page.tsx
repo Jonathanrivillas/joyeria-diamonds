@@ -13,8 +13,9 @@ const ACCIONES: Record<string, string> = {
   TRASLADO: "Hizo un traslado",
   ARQUEO_CERRADO: "Terminó un arqueo",
   ARQUEO_CERRADO_CON_AJUSTES: "Terminó un arqueo y corrigió el inventario",
-  CATEGORIA_CREADA: "Creó una categoría",
-  CATEGORIA_EDITADA: "Cambió una categoría o sus precios",
+  PRECIO_GRAMO_CAMBIADO: "Cambió el precio del gramo",
+  CATEGORIA_CREADA: "Creó un tipo de pieza",
+  CATEGORIA_EDITADA: "Cambió un tipo de pieza",
   LOCAL_GUARDADO: "Guardó los datos de un local",
   USUARIO_CREADO: "Creó un usuario",
   USUARIO_ACTUALIZADO: "Cambió un usuario o su contraseña",
@@ -40,6 +41,8 @@ function resumen(accion: string, d: D | null): string {
       const n = Array.isArray(d.diferencias) ? d.diferencias.length : 0;
       return n ? `${n} categoría(s) con diferencia` : "Todo estaba igual";
     }
+    case "PRECIO_GRAMO_CAMBIADO":
+      return `De ${cop(Number(d.antes))} a ${cop(Number(d.despues))} el gramo`;
     case "CATEGORIA_CREADA":
     case "CATEGORIA_EDITADA":
       return String((d.despues as D | undefined)?.nombre ?? "");

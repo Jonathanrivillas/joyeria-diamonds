@@ -343,7 +343,7 @@ export function VentaForm({
                 {!cambiarPrecio ? (
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-lg">
-                      Precio {cat.controlaPeso ? "por gramo" : "por pieza"}: <span className="font-bold">{cop(precio)}</span>
+                      {cat.controlaPeso ? "Precio del gramo hoy" : "Precio por pieza"}: <span className="font-bold">{cop(precio)}</span>
                     </p>
                     <Button variant="secondary" icon={Pencil} onClick={() => setCambiarPrecio(true)}>
                       Cambiar precio
@@ -355,7 +355,11 @@ export function VentaForm({
                     value={precio}
                     onChange={setPrecio}
                     autoFocus
-                    hint={`El precio normal es ${cop(cat.precio)}. Este cambio es solo para esta pieza.`}
+                    hint={
+                      cat.controlaPeso
+                        ? `El gramo hoy está a ${cop(cat.precio)}. Este cambio es solo para esta pieza (por ejemplo, un descuento).`
+                        : `El precio normal es ${cop(cat.precio)}. Este cambio es solo para esta pieza.`
+                    }
                   />
                 )}
                 <div className="space-y-3">

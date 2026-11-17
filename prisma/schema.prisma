@@ -43,6 +43,18 @@ model Usuario {
   gastos       Gasto[]
   arqueos      Arqueo[]
   traslados    Traslado[]
+  preciosGramo PrecioGramo[]
+}
+
+/// Precio del gramo de oro. El vigente es el último registrado; se confirma cada día.
+model PrecioGramo {
+  id        Int      @id @default(autoincrement())
+  valor     Int // pesos por gramo
+  fecha     DateTime @default(now())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([fecha])
 }
 
 model Categoria {

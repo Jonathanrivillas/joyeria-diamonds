@@ -1,14 +1,16 @@
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
+import { precioDelDia } from "@/lib/precio";
 import { PageContainer } from "@/components/ui";
 import { VentaForm } from "./venta-form";
 
 export default async function NuevaVentaPage() {
   const s = await requireSesion();
   const { localId, locales } = await getAlcance(s);
-  const [categorias, existencias] = await Promise.all([
+  const [categorias, existencias, precio] = await Promise.all([
     db.categoria.findMany({ where: { activa: true }, orderBy: { orden: "asc" } }),
     db.existencia.findMany(),
+    precioDelDia(),
   ]);
 
   return (
@@ -21,7 +23,8 @@ export default async function NuevaVentaPage() {
           id: c.id,
           nombre: c.nombre,
           controlaPeso: c.controlaPeso,
-          precio: c.controlaPeso ? c.precioGramoSugerido : c.precioUnidadSugerido,
+          // Todo se vende por gramos al precio del día (configurado en el inicio).
+          precio: c.controlaPeso ? precio.valor : c.precioUnidadSugerido,
         }))}
         existencias={existencias.map((e) => ({
           localId: e.localId,
