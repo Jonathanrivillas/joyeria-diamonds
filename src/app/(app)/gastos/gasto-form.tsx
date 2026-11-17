@@ -1,20 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import clsx from "clsx";
-import { Users, Home, Zap, Package, MoreHorizontal, Camera, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { registrarGasto } from "./actions";
-import { Aviso } from "@/components/ui";
-import { CampoDinero } from "@/components/campos";
+import { Alert, Button, Card, Chip, ChipGroup, ChoiceGrid, ChoiceTile, Field, FileButton, MoneyInput, Textarea } from "@/components/ui";
+import { TIPOS_GASTO_UI as TIPOS } from "@/components/gastos/tipos-gasto";
 import { TAMANO_MAXIMO } from "@/lib/archivos";
-
-const TIPOS = [
-  { id: "INSUMOS", nombre: "Insumos", detalle: "Bolsas, estuches...", icon: Package },
-  { id: "SERVICIOS", nombre: "Servicios", detalle: "Luz, internet...", icon: Zap },
-  { id: "NOMINA", nombre: "Nómina", detalle: "Pago a empleados", icon: Users },
-  { id: "ARRIENDO", nombre: "Arriendo", detalle: "Pago del local", icon: Home },
-  { id: "OTROS", nombre: "Otro", detalle: "Cualquier otro", icon: MoreHorizontal },
-];
 
 const LADO_MAXIMO = 1600; // píxeles: suficiente para leer un recibo
 
@@ -54,6 +45,11 @@ export function GastoForm({
   const [procesando, setProcesando] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState("");
   const [formKey, setFormKey] = useState(0);
+  const [localGasto, setLocalGasto] = useState<number | null>(localDefecto ?? null);
+
+  // El local es el paso 1 solo si hay de dónde escoger; los demás pasos se numeran después.
+  const conLocal = esAdmin && locales.length > 1;
+  const n = (paso: number) => (conLocal ? paso + 1 : paso);
 
   useEffect(() => {
     if (estado?.ok) {
@@ -67,6 +63,7 @@ export function GastoForm({
   }, [estado]);
 
   const listo = tipo && monto > 0 && justificacion.trim().length >= 5;
+
   async function alEscogerArchivo(e: React.ChangeEvent<HTMLInputElement>) {
     const input = e.currentTarget;
     const original = input.files?.[0];
@@ -93,83 +90,81 @@ export function GastoForm({
     setArchivo(original.name);
   }
 
+  const textoBoton = !tipo
+    ? "Escoja el tipo de gasto"
+    : monto <= 0
+      ? "Escriba cuánto costó"
+      : justificacion.trim().length < 5
+        ? "Escriba en qué se gastó"
+        : "Guardar el gasto";
+
   return (
-    <form key={formKey} action={accion} className="card p-6"><div className="space-y-6">
-      <h2 className="text-2xl font-bold">Anotar un gasto</h2>
+    <Card padding="lg">
+      <form key={formKey} action={accion} className="space-y-6">
+        <h2 className="text-2xl font-bold">Anotar un gasto</h2>
 
-      {estado?.ok && <Aviso tipo="ok">{estado.ok}</Aviso>}
+        {estado?.ok && <Alert tone="success">{estado.ok}</Alert>}
 
-      {esAdmin && (
-        <div>
-          <label className="label">¿De qué local es el gasto?</label>
-          <select name="localId" className="input" defaultValue={localDefecto ?? undefined}>
-            {locales.map((l) => (
-              <option key={l.id} value={l.id}>{l.nombre}</option>
+        {esAdmin && <input type="hidden" name="localId" value={localGasto ?? ""} />}
+        {conLocal && (
+          <Field label="1. ¿De qué local es el gasto?">
+            <ChipGroup>
+              {locales.map((l) => (
+                <Chip key={l.id} selected={localGasto === l.id} onClick={() => setLocalGasto(l.id)}>
+                  {l.nombre}
+                </Chip>
+              ))}
+            </ChipGroup>
+          </Field>
+        )}
+
+        <Field label={`${n(1)}. ¿Qué tipo de gasto es?`}>
+          <input type="hidden" name="tipo" value={tipo} />
+          <ChoiceGrid columns={2}>
+            {TIPOS.map((t, i) => (
+              <ChoiceTile
+                key={t.id}
+                layout="inline"
+                selected={tipo === t.id}
+                onClick={() => setTipo(t.id)}
+                icon={t.icon}
+                title={t.nombre}
+                description={t.detalle}
+                className={i === TIPOS.length - 1 && TIPOS.length % 2 === 1 ? "col-span-2" : undefined}
+              />
             ))}
-          </select>
-        </div>
-      )}
+          </ChoiceGrid>
+        </Field>
 
-      <div>
-        <p className="label">1. ¿Qué tipo de gasto es?</p>
-        <input type="hidden" name="tipo" value={tipo} />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {TIPOS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTipo(t.id)}
-              className={clsx(
-                "flex flex-col items-center gap-1 rounded-2xl border-2 p-4 text-center transition active:scale-[0.98]",
-                tipo === t.id ? "border-oro-700 bg-oro-700 text-white" : "border-stone-200 bg-white hover:border-oro-500"
-              )}
-            >
-              <t.icon className="h-8 w-8" />
-              <span className="text-lg font-bold">{t.nombre}</span>
-              <span className={clsx("text-sm", tipo === t.id ? "text-oro-50" : "text-stone-500")}>{t.detalle}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+        <MoneyInput name="monto" label={`${n(2)}. ¿Cuánto costó?`} value={monto} onChange={setMonto} size="xl" />
 
-      <CampoDinero name="monto" label="2. ¿Cuánto costó?" value={monto} onChange={setMonto} grande />
-
-      <div>
-        <label className="label" htmlFor="justificacion">3. ¿En qué se gastó y por qué?</label>
-        <textarea
-          id="justificacion"
+        <Textarea
+          label={`${n(3)}. ¿En qué se gastó y por qué?`}
           name="justificacion"
-          className="input text-lg"
-          rows={3}
+          size="lg"
           value={justificacion}
           onChange={(e) => setJustificacion(e.target.value)}
           placeholder="Ej: Compra de 100 bolsas de regalo para diciembre"
+          hint="Es obligatorio, para saber siempre en qué se fue la plata."
         />
-        <p className="ayuda">Es obligatorio, para saber siempre en qué se fue la plata.</p>
-      </div>
 
-      <div>
-        <p className="label">4. Foto del recibo (si tiene)</p>
-        <label className={clsx("btn w-full cursor-pointer border-2 border-dashed", archivo ? "border-emerald-400 bg-emerald-50 text-emerald-800" : "border-stone-300 bg-white")}>
-          {archivo ? <Check className="h-6 w-6" /> : <Camera className="h-6 w-6" />}
-          {procesando ? "Preparando la foto..." : archivo ? `Recibo adjunto: ${archivo}` : "Tomar foto o escoger archivo"}
-          <input
-            type="file"
-            name="soporte"
-            accept="image/*,application/pdf"
-            capture="environment"
-            className="sr-only"
-            onChange={alEscogerArchivo}
-          />
-        </label>
-        {errorArchivo && <p className="mt-2 text-base font-medium text-red-700">{errorArchivo}</p>}
-      </div>
+        <FileButton
+          label={`${n(4)}. Foto del recibo (si tiene)`}
+          name="soporte"
+          accept="image/*,application/pdf"
+          capture="environment"
+          fileName={archivo}
+          processing={procesando}
+          processingText="Preparando la foto..."
+          error={errorArchivo}
+          onChange={alEscogerArchivo}
+        />
 
-      {estado?.error && <Aviso tipo="error">{estado.error}</Aviso>}
-      <button className="btn-primary btn-grande w-full" disabled={pendiente || procesando || !listo}>
-        <Check className="h-6 w-6" />
-        {pendiente ? "Guardando..." : !tipo ? "Escoja el tipo de gasto" : monto <= 0 ? "Escriba cuánto costó" : justificacion.trim().length < 5 ? "Escriba en qué se gastó" : "Guardar el gasto"}
-      </button>
-    </div></form>
+        {estado?.error && <Alert tone="danger">{estado.error}</Alert>}
+        <Button type="submit" size="lg" block icon={Check} loading={pendiente} loadingText="Guardando..." disabled={procesando || !listo}>
+          {textoBoton}
+        </Button>
+      </form>
+    </Card>
   );
 }

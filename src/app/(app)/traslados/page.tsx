@@ -1,7 +1,8 @@
+import { ArrowLeftRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { fechaHora, gramos } from "@/lib/format";
-import { PageHeader, Vacio } from "@/components/ui";
+import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr } from "@/components/ui";
 import { TrasladoForm } from "./traslado-form";
 
 export default async function TrasladosPage() {
@@ -17,51 +18,54 @@ export default async function TrasladosPage() {
   ]);
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        titulo="Traslados"
-        ayuda="Use esto para llevar piezas de un local al otro. Se descuentan del local que las envía y se suman al que las recibe."
+        title="Traslados"
+        help="Use esto para llevar piezas de un local al otro. Se descuentan del local que las envía y se suman al que las recibe."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
         <TrasladoForm
           locales={locales.map((l) => ({ id: l.id, nombre: l.nombre }))}
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre, controlaPeso: c.controlaPeso }))}
         />
-        <div className="card overflow-x-auto">
+        <Card>
+          <CardHeader title="Últimos traslados" />
           {traslados.length === 0 ? (
-            <Vacio texto="Aún no hay traslados" />
+            <EmptyState icon={ArrowLeftRight} title="Aún no hay traslados." />
           ) : (
-            <table className="tabla">
+            <Table>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Origen → Destino</th>
-                  <th>Categoría</th>
-                  <th className="num">Peso</th>
-                  <th className="num">Cant.</th>
-                  <th>Usuario</th>
-                  <th>Nota</th>
+                  <Th>Fecha</Th>
+                  <Th>Origen → Destino</Th>
+                  <Th>Categoría</Th>
+                  <Th numeric>Peso</Th>
+                  <Th numeric>Cant.</Th>
+                  <Th>Usuario</Th>
+                  <Th>Nota</Th>
                 </tr>
               </thead>
               <tbody>
                 {traslados.flatMap((t) =>
                   t.items.map((i) => (
-                    <tr key={i.id}>
-                      <td className="whitespace-nowrap">{fechaHora(t.fecha)}</td>
-                      <td>{t.origen.nombre} → {t.destino.nombre}</td>
-                      <td>{i.categoria.nombre}</td>
-                      <td className="num">{gramos(i.pesoCg)}</td>
-                      <td className="num">{i.cantidad}</td>
-                      <td>{t.usuario.nombre}</td>
-                      <td className="text-xs text-stone-500">{t.nota}</td>
-                    </tr>
+                    <Tr key={i.id}>
+                      <Td className="whitespace-nowrap">{fechaHora(t.fecha)}</Td>
+                      <Td>
+                        {t.origen.nombre} → {t.destino.nombre}
+                      </Td>
+                      <Td>{i.categoria.nombre}</Td>
+                      <Td numeric>{gramos(i.pesoCg)}</Td>
+                      <Td numeric>{i.cantidad}</Td>
+                      <Td>{t.usuario.nombre}</Td>
+                      <Td className="text-sm text-neutral-500">{t.nota}</Td>
+                    </Tr>
                   ))
                 )}
               </tbody>
-            </table>
+            </Table>
           )}
-        </div>
+        </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

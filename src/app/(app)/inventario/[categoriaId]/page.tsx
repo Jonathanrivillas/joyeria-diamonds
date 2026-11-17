@@ -1,9 +1,19 @@
 import { notFound } from "next/navigation";
-import clsx from "clsx";
+import { History } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { gramos, entero, fechaHora, TIPOS_MOVIMIENTO } from "@/lib/format";
-import { PageHeader, Vacio } from "@/components/ui";
+import { Card, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr, cn } from "@/components/ui";
+
+/** "+5,20" en verde o "-5,20" en rojo. */
+function Cambio({ valor, texto }: { valor: number; texto: string }) {
+  return (
+    <span className={cn(valor < 0 ? "text-danger-600" : "text-success-700")}>
+      {valor > 0 ? "+" : ""}
+      {texto}
+    </span>
+  );
+}
 
 export default async function KardexPage({ params }: { params: Promise<{ categoriaId: string }> }) {
   const { categoriaId } = await params;
@@ -34,57 +44,55 @@ export default async function KardexPage({ params }: { params: Promise<{ categor
   });
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        titulo={`Movimientos de ${cat.nombre}`}
-        subtitulo={`Hay ahora: ${cat.controlaPeso ? gramos(saldo._sum.pesoCg ?? 0) + " · " : ""}${entero(saldo._sum.cantidad ?? 0)} piezas`}
-        volver={{ href: "/inventario", texto: "Volver al inventario" }}
-        ayuda="Cada vez que entra o sale mercancía queda anotado aquí, con quién lo hizo. La columna «Quedó» muestra cuánto había después de cada movimiento."
+        title={`Movimientos de ${cat.nombre}`}
+        subtitle={`Hay ahora: ${cat.controlaPeso ? gramos(saldo._sum.pesoCg ?? 0) + " · " : ""}${entero(saldo._sum.cantidad ?? 0)} piezas`}
+        back={{ href: "/inventario", label: "Volver al inventario" }}
+        help="Cada vez que entra o sale mercancía queda anotado aquí, con quién lo hizo. La columna «Quedó» muestra cuánto había después de cada movimiento."
       />
-      <div className="card overflow-x-auto">
+      <Card>
         {filas.length === 0 ? (
-          <Vacio texto="Sin movimientos" />
+          <EmptyState icon={History} title="Esta categoría todavía no tiene movimientos." />
         ) : (
-          <table className="tabla">
+          <Table>
             <thead>
               <tr>
-                <th>Cuándo</th>
-                {!localId && <th>Local</th>}
-                <th>Qué pasó</th>
-                <th>Factura / ref.</th>
-                <th className="num">Gramos</th>
-                <th className="num">Piezas</th>
-                <th className="num">Quedó (g)</th>
-                <th className="num">Quedó (pzs)</th>
-                <th>Quién</th>
-                <th>Nota</th>
+                <Th>Cuándo</Th>
+                {!localId && <Th>Local</Th>}
+                <Th>Qué pasó</Th>
+                <Th>Factura / ref.</Th>
+                <Th numeric>Gramos</Th>
+                <Th numeric>Piezas</Th>
+                <Th numeric>Quedó (g)</Th>
+                <Th numeric>Quedó (pzs)</Th>
+                <Th>Quién</Th>
+                <Th>Nota</Th>
               </tr>
             </thead>
             <tbody>
               {filas.map((m) => (
-                <tr key={m.id}>
-                  <td className="whitespace-nowrap">{fechaHora(m.fecha)}</td>
-                  {!localId && <td>{m.local.nombre}</td>}
-                  <td>{TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo}</td>
-                  <td className="font-mono text-xs">{m.referencia ?? ""}</td>
-                  <td className={clsx("num", m.pesoCg < 0 ? "text-red-600" : "text-emerald-700")}>
-                    {m.pesoCg > 0 ? "+" : ""}
-                    {gramos(m.pesoCg, false)}
-                  </td>
-                  <td className={clsx("num", m.cantidad < 0 ? "text-red-600" : "text-emerald-700")}>
-                    {m.cantidad > 0 ? "+" : ""}
-                    {m.cantidad}
-                  </td>
-                  <td className="num font-medium">{gramos(m.saldoPeso, false)}</td>
-                  <td className="num font-medium">{m.saldoCant}</td>
-                  <td>{m.usuario.nombre}</td>
-                  <td className="text-xs text-stone-500">{m.nota ?? ""}</td>
-                </tr>
+                <Tr key={m.id}>
+                  <Td className="whitespace-nowrap">{fechaHora(m.fecha)}</Td>
+                  {!localId && <Td>{m.local.nombre}</Td>}
+                  <Td>{TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo}</Td>
+                  <Td className="font-mono text-sm">{m.referencia ?? ""}</Td>
+                  <Td numeric>
+                    <Cambio valor={m.pesoCg} texto={gramos(m.pesoCg, false)} />
+                  </Td>
+                  <Td numeric>
+                    <Cambio valor={m.cantidad} texto={String(m.cantidad)} />
+                  </Td>
+                  <Td numeric className="font-medium">{gramos(m.saldoPeso, false)}</Td>
+                  <Td numeric className="font-medium">{m.saldoCant}</Td>
+                  <Td>{m.usuario.nombre}</Td>
+                  <Td className="text-sm text-neutral-500">{m.nota ?? ""}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

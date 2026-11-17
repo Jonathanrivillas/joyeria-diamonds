@@ -1,14 +1,15 @@
-import Link from "next/link";
-import clsx from "clsx";
-import { ClipboardCheck, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
+import { ChevronRight, ClipboardCheck } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
-import { inicioDia } from "@/lib/fechas";
-import { cuando, gramos } from "@/lib/format";
-import { PageHeader, Vacio } from "@/components/ui";
+import { aISO, inicioDia, sumarDias } from "@/lib/fechas";
+import { fechaLarga, hora } from "@/lib/format";
+import { Button, Card, Chip, ChipGroup, EmptyState, List, ListItem, PageContainer, PageHeader, Section } from "@/components/ui";
+import { ArqueoHoyResumen, ArqueoResultadoBadge, type ArqueoLocalHoy } from "@/components/arqueo/arqueo-estado";
 import { iniciarArqueo } from "./actions";
 
-export default async function ArqueoPage() {
+export default async function ArqueoPage({ searchParams }: { searchParams: Promise<{ dif?: string }> }) {
+  const sp = await searchParams;
+  const soloDiferencia = sp.dif === "1";
   const s = await requireSesion();
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
@@ -16,103 +17,115 @@ export default async function ArqueoPage() {
 
   const [arqueos, deHoy] = await Promise.all([
     db.arqueo.findMany({
-      where: localId ? { localId } : {},
+      where: {
+        ...(localId ? { localId } : {}),
+        ...(soloDiferencia ? { estado: "CERRADO", detalles: { some: { estado: { in: ["FALTA", "SOBRA"] } } } } : {}),
+      },
       orderBy: { fecha: "desc" },
       take: 60,
       include: { local: true, usuario: true, detalles: { select: { estado: true } } },
     }),
-    db.arqueo.findMany({ where: { ...(localId ? { localId } : {}), OR: [{ fecha: { gte: hoy } }, { estado: "ABIERTO" }] }, orderBy: { fecha: "desc" } }),
+    db.arqueo.findMany({
+      where: { ...(localId ? { localId } : {}), OR: [{ fecha: { gte: hoy } }, { estado: "ABIERTO" }] },
+      orderBy: { fecha: "desc" },
+    }),
   ]);
 
+  const estadoHoy: ArqueoLocalHoy[] = localesVista.map((l) => ({
+    localId: l.id,
+    nombre: l.nombre,
+    abiertoId: deHoy.find((a) => a.localId === l.id && a.estado === "ABIERTO")?.id,
+    cerrado: deHoy.find((a) => a.localId === l.id && a.estado === "CERRADO" && a.fecha >= hoy),
+  }));
+
+  // ---- Arqueos anteriores agrupados por día ----
+  const ayer = aISO(sumarDias(hoy, -1));
+  const grupos: { iso: string; titulo: string; arqueos: typeof arqueos }[] = [];
+  for (const a of arqueos) {
+    const iso = aISO(a.fecha);
+    let g = grupos.at(-1);
+    if (!g || g.iso !== iso) {
+      g = { iso, titulo: iso === aISO(hoy) ? "Hoy" : iso === ayer ? "Ayer" : fechaLarga(a.fecha), arqueos: [] };
+      grupos.push(g);
+    }
+    g.arqueos.push(a);
+  }
+
   return (
-    <div className="mx-auto max-w-4xl">
+    <PageContainer width="fluid">
       <PageHeader
-        titulo="Arqueo"
-        ayuda="El arqueo es contar la mercancía y compararla con lo que dice el sistema, como en la planilla de papel. Se hace una vez al día."
+        title="Arqueo"
+        help="El arqueo es contar la mercancía y compararla con lo que dice el sistema, como en la planilla de papel. Se hace una vez al día."
       />
 
-      <div className="mb-8 space-y-4">
-        {localesVista.map((l) => {
-          const abierto = deHoy.find((a) => a.localId === l.id && a.estado === "ABIERTO");
-          const hecho = deHoy.find((a) => a.localId === l.id && a.estado === "CERRADO" && a.fecha >= hoy);
-          return (
-            <div key={l.id} className={clsx("card flex flex-wrap items-center gap-4 p-6", !hecho && "border-2 border-oro-300")}>
-              {hecho && !abierto ? (
-                <CheckCircle2 className="h-10 w-10 text-emerald-600" />
-              ) : abierto ? (
-                <AlertCircle className="h-10 w-10 text-amber-600" />
-              ) : (
-                <ClipboardCheck className="h-10 w-10 text-oro-600" />
-              )}
-              <div className="min-w-[14rem] flex-1">
-                <p className="text-xl font-bold">
-                  {localesVista.length > 1 ? l.nombre : "Arqueo de hoy"}
-                </p>
-                <p className="text-lg text-stone-600">
-                  {abierto
-                    ? "Hay un arqueo empezado sin terminar."
-                    : hecho
-                      ? hecho.pesoContadoCg === hecho.pesoSistemaCg
-                        ? "El arqueo de hoy ya está hecho. Todo cuadró ✓"
-                        : `El arqueo de hoy ya está hecho, con diferencia de ${gramos(hecho.pesoContadoCg - hecho.pesoSistemaCg)}.`
-                      : "Todavía no se ha hecho el arqueo de hoy."}
-                </p>
-              </div>
-              {abierto ? (
-                <Link href={`/arqueo/${abierto.id}`} className="btn-primary btn-grande">
-                  Continuar el arqueo
-                </Link>
-              ) : (
-                <form action={iniciarArqueo}>
-                  <input type="hidden" name="localId" value={l.id} />
-                  <button className={hecho ? "btn-secondary" : "btn-primary btn-grande"}>
-                    {hecho ? "Hacer otro arqueo" : "Empezar el arqueo"}
-                  </button>
-                </form>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,32rem)_1fr]">
+        <ArqueoHoyResumen
+          locales={estadoHoy}
+          accion={(l) =>
+            l.abiertoId ? (
+              <Button href={`/arqueo/${l.abiertoId}`} iconRight={ChevronRight}>
+                Continuar
+              </Button>
+            ) : (
+              <form action={iniciarArqueo}>
+                <input type="hidden" name="localId" value={l.localId} />
+                <Button type="submit" variant={l.cerrado ? "ghost" : "primary"}>
+                  {l.cerrado ? "Hacer otro" : "Empezar"}
+                </Button>
+              </form>
+            )
+          }
+        />
 
-      <h2 className="mb-3 text-xl font-bold text-stone-700">Arqueos anteriores</h2>
-      <div className="card">
-        {arqueos.length === 0 ? (
-          <Vacio texto="Aún no hay arqueos." />
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {arqueos.map((a) => {
-              const dif = a.pesoContadoCg - a.pesoSistemaCg;
-              const conDif = a.detalles.some((d) => d.estado && d.estado !== "OK");
-              const cerrado = a.estado === "CERRADO";
-              return (
-                <li key={a.id}>
-                  <Link href={`/arqueo/${a.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-stone-50">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-semibold">{cuando(a.fecha)}</p>
-                      <p className="text-base text-stone-500">
-                        {a.usuario.nombre}
-                        {!localId && ` · ${a.local.nombre}`}
-                      </p>
-                    </div>
-                    {!cerrado ? (
-                      <span className="badge bg-amber-100 text-amber-900">Sin terminar</span>
-                    ) : conDif ? (
-                      <span className="badge bg-red-100 text-red-800">
-                        Diferencia {gramos(dif)}
-                        {a.ajustesAplicados ? " · corregido" : ""}
-                      </span>
-                    ) : (
-                      <span className="badge bg-emerald-100 text-emerald-800">✓ Cuadró</span>
-                    )}
-                    <ChevronRight className="h-6 w-6 text-stone-400" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <Section title="Arqueos anteriores">
+          <ChipGroup>
+            <Chip href="/arqueo" selected={!soloDiferencia}>
+              Todos
+            </Chip>
+            <Chip href="/arqueo?dif=1" selected={soloDiferencia}>
+              Solo los que no cuadraron
+            </Chip>
+          </ChipGroup>
+
+          <Card>
+            {arqueos.length === 0 ? (
+              soloDiferencia ? (
+                <EmptyState icon={ClipboardCheck} title="Todos los arqueos cuadraron.">
+                  <Button variant="secondary" href="/arqueo">
+                    Ver todos
+                  </Button>
+                </EmptyState>
+              ) : (
+                <EmptyState icon={ClipboardCheck} title="Aún no hay arqueos." />
+              )
+            ) : (
+              grupos.map((g, i) => (
+                <section key={g.iso} aria-label={g.titulo} className={i > 0 ? "border-t border-neutral-200" : undefined}>
+                  <h3 className={`bg-neutral-50 px-5 py-3 text-base font-bold text-neutral-800 ${i === 0 ? "rounded-t-2xl" : ""}`}>{g.titulo}</h3>
+                  <List>
+                    {g.arqueos.map((a) => (
+                      <ListItem
+                        key={a.id}
+                        href={`/arqueo/${a.id}`}
+                        title={localId ? hora(a.fecha) : `${a.local.nombre} · ${hora(a.fecha)}`}
+                        meta={`Contó: ${a.usuario.nombre}`}
+                        end={
+                          <ArqueoResultadoBadge
+                            cerrado={a.estado === "CERRADO"}
+                            conDiferencia={a.detalles.some((d) => d.estado && d.estado !== "OK")}
+                            diferenciaCg={a.pesoContadoCg - a.pesoSistemaCg}
+                            corregido={a.ajustesAplicados}
+                          />
+                        }
+                      />
+                    ))}
+                  </List>
+                </section>
+              ))
+            )}
+          </Card>
+        </Section>
       </div>
-    </div>
+    </PageContainer>
   );
 }

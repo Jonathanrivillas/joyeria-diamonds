@@ -1,11 +1,32 @@
-import Link from "next/link";
-import clsx from "clsx";
-import { ShoppingBag, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, SlidersHorizontal, Search, Receipt } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
-import { cop, gramos, cuando, METODOS_PAGO, plural } from "@/lib/format";
-import { PageHeader, Vacio } from "@/components/ui";
+import { cop, fecha, fechaLarga, gramos, METODOS_PAGO, plural } from "@/lib/format";
+import { rangoActivo, rangosRapidos } from "@/lib/rangos";
+import {
+  Button,
+  Card,
+  DatePicker,
+  Disclosure,
+  EmptyState,
+  FormGrid,
+  Icon,
+  Input,
+  List,
+  PageContainer,
+  PageHeader,
+  RemovableChip,
+  Select,
+  Stat,
+  StatPanel,
+} from "@/components/ui";
+import { RangoFechas } from "@/components/filtros/rango-fechas";
+import { VentaFila } from "@/components/ventas/venta-fila";
+import { VentasTabla } from "@/components/ventas/ventas-tabla";
+
+const ESTADOS: Record<string, string> = { ACTIVA: "Vigentes", ANULADA: "Anuladas" };
+const LIMITE = 500;
 
 export default async function VentasPage({
   searchParams,
@@ -27,10 +48,7 @@ export default async function VentasPage({
     ...(sp.estado ? { estado: sp.estado } : {}),
     ...(sp.q
       ? {
-          OR: [
-            { numero: { contains: sp.q, mode: "insensitive" as const } },
-            { clienteNombre: { contains: sp.q, mode: "insensitive" as const } },
-          ],
+          OR: [{ numero: { contains: sp.q, mode: "insensitive" as const } }, { clienteNombre: { contains: sp.q, mode: "insensitive" as const } }],
         }
       : {}),
   };
@@ -39,137 +57,196 @@ export default async function VentasPage({
     db.venta.findMany({
       where,
       orderBy: { fecha: "desc" },
-      take: 500,
+      take: LIMITE,
       include: { local: true, usuario: true, items: { include: { categoria: true } } },
     }),
     db.usuario.findMany({ orderBy: { nombre: "asc" }, ...(localId ? { where: { OR: [{ localId }, { rol: "ADMIN" }] } } : {}) }),
   ]);
   const activas = ventas.filter((v) => v.estado === "ACTIVA");
+  const anuladas = ventas.length - activas.length;
   const total = activas.reduce((a, v) => a + v.total, 0);
   const peso = activas.reduce((a, v) => a + v.items.reduce((b, i) => b + i.pesoCg, 0), 0);
 
-  const rapidos = [
-    { t: "Hoy", d: hoy, h: hoy },
-    { t: "Ayer", d: sumarDias(hoy, -1), h: sumarDias(hoy, -1) },
-    { t: "Últimos 7 días", d: sumarDias(hoy, -6), h: hoy },
-    { t: "Últimos 30 días", d: sumarDias(hoy, -29), h: hoy },
-  ];
-  const sinFiltrosExtra = !sp.metodo && !sp.vendedor && !sp.estado && !sp.q;
-  const rapidoActivo = sinFiltrosExtra ? rapidos.find((r) => aISO(r.d) === aISO(desde) && aISO(r.h) === aISO(hasta))?.t : undefined;
+  // ---- Filtros: enlaces que conservan lo demás ----
+  const actuales = { desde: aISO(desde), hasta: aISO(hasta), q: sp.q, metodo: sp.metodo, vendedor: sp.vendedor, estado: sp.estado };
+  const enlace = (cambios: Partial<typeof actuales>) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries({ ...actuales, ...cambios })) if (v) p.set(k, v);
+    return `/ventas?${p}`;
+  };
+  const otrosFiltros = new URLSearchParams(
+    Object.entries({ q: sp.q, metodo: sp.metodo, vendedor: sp.vendedor, estado: sp.estado }).filter((e): e is [string, string] => !!e[1]),
+  ).toString();
+
+  const rangos = rangosRapidos(hoy);
+  const activo = rangoActivo(rangos, desde, hasta)?.etiqueta;
+  const vendedor = usuarios.find((u) => String(u.id) === sp.vendedor);
+  const filtrosActivos = [
+    !activo && {
+      texto: aISO(desde) === aISO(hasta) ? `Fecha: ${fecha(desde)}` : `Fechas: ${fecha(desde)} – ${fecha(hasta)}`,
+      href: enlace({ desde: undefined, hasta: undefined }),
+    },
+    sp.q && { texto: `Búsqueda: “${sp.q}”`, href: enlace({ q: undefined }) },
+    sp.metodo && { texto: METODOS_PAGO[sp.metodo] ?? sp.metodo, href: enlace({ metodo: undefined }) },
+    vendedor && { texto: `Vendió: ${vendedor.nombre}`, href: enlace({ vendedor: undefined }) },
+    sp.estado && { texto: ESTADOS[sp.estado] ?? sp.estado, href: enlace({ estado: undefined }) },
+  ].filter((f): f is { texto: string; href: string } => !!f);
+
+  // ---- Agrupar por día cuando se ven varios días ----
+  const variosDias = aISO(desde) !== aISO(hasta);
+  const ayer = aISO(sumarDias(hoy, -1));
+  const nombreDia = (iso: string, d: Date) => (iso === aISO(hoy) ? "Hoy" : iso === ayer ? "Ayer" : fechaLarga(d));
+  const grupos: { iso: string; titulo: string; total: number; ventas: typeof ventas }[] = [];
+  for (const v of ventas) {
+    const iso = variosDias ? aISO(v.fecha) : "todo";
+    let g = grupos.at(-1);
+    if (!g || g.iso !== iso) {
+      g = { iso, titulo: nombreDia(iso, v.fecha), total: 0, ventas: [] };
+      grupos.push(g);
+    }
+    g.ventas.push(v);
+    if (v.estado === "ACTIVA") g.total += v.total;
+  }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <PageHeader titulo="Facturas" ayuda="Aquí están las ventas ya hechas. Toque una para verla, imprimirla o anularla.">
-        <Link href="/ventas/nueva" className="btn-primary">
-          <ShoppingBag className="h-5 w-5" /> Vender
-        </Link>
-      </PageHeader>
+    <PageContainer width="fluid">
+      <PageHeader
+        title="Facturas"
+        help="Aquí están las ventas ya hechas. Toque una para verla, imprimirla o anularla."
+        actions={
+          <Button href="/ventas/nueva" size="lg" icon={ShoppingBag}>
+            Nueva venta
+          </Button>
+        }
+      />
 
-      <div className="no-print mb-4 flex flex-wrap gap-2">
-        {rapidos.map((r) => (
-          <Link
-            key={r.t}
-            href={`/ventas?desde=${aISO(r.d)}&hasta=${aISO(r.h)}`}
-            className={clsx("btn", rapidoActivo === r.t ? "bg-oro-700 text-white" : "border-2 border-stone-300 bg-white hover:bg-stone-50")}
-          >
-            {r.t}
-          </Link>
-        ))}
-      </div>
+      <form action="/ventas" className="no-print space-y-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="flex flex-wrap items-end gap-3">
+            <Input
+              label="Buscar una factura"
+              hideLabel
+              name="q"
+              defaultValue={sp.q ?? ""}
+              placeholder="Número de factura o nombre del cliente"
+              prefix={<Icon icon={Search} size="sm" />}
+              className="pl-12"
+              containerClassName="min-w-[16rem] flex-1"
+            />
+            <Button type="submit">Buscar</Button>
+          </div>
 
-      <details className="card no-print mb-4" open={!sinFiltrosExtra}>
-        <summary className="flex cursor-pointer items-center gap-2 px-5 py-4 text-base font-semibold text-stone-700">
-          <SlidersHorizontal className="h-5 w-5" /> Buscar una factura o filtrar
-        </summary>
-        <form className="grid gap-4 border-t border-stone-100 p-5 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className="label">Número o nombre del cliente</label>
-            <input name="q" className="input" defaultValue={sp.q ?? ""} placeholder="Ej: L1-000123 o María" />
-          </div>
-          <div>
-            <label className="label">Desde</label>
-            <input type="date" name="desde" className="input" defaultValue={aISO(desde)} />
-          </div>
-          <div>
-            <label className="label">Hasta</label>
-            <input type="date" name="hasta" className="input" defaultValue={aISO(hasta)} />
-          </div>
-          <div>
-            <label className="label">Forma de pago</label>
-            <select name="metodo" className="input" defaultValue={sp.metodo ?? ""}>
-              <option value="">Todas</option>
-              {Object.entries(METODOS_PAGO).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Quién vendió</label>
-            <select name="vendedor" className="input" defaultValue={sp.vendedor ?? ""}>
-              <option value="">Todos</option>
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>{u.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Estado</label>
-            <select name="estado" className="input" defaultValue={sp.estado ?? ""}>
-              <option value="">Todas</option>
-              <option value="ACTIVA">Vigentes</option>
-              <option value="ANULADA">Anuladas</option>
-            </select>
-          </div>
-          <div className="flex gap-3 sm:col-span-2 lg:col-span-3">
-            <button className="btn-primary">Buscar</button>
-            <Link href="/ventas" className="btn-secondary">Limpiar</Link>
-          </div>
-        </form>
-      </details>
+          <RangoFechas
+            ruta="/ventas"
+            rangos={rangos}
+            activo={activo}
+            desde={aISO(desde)}
+            hasta={aISO(hasta)}
+            max={aISO(hoy)}
+            personalizado={false}
+            conservar={otrosFiltros}
+          />
+        </div>
 
-      <div className="mb-4 rounded-2xl bg-oro-50 px-5 py-4 text-lg">
-        <span className="font-bold">{plural(activas.length, "factura", "facturas")}</span> por{" "}
-        <span className="font-bold text-oro-800">{cop(total)}</span> · {gramos(peso)} vendidos
-      </div>
+        <Disclosure title="Más filtros: fechas, forma de pago, vendedor" icon={SlidersHorizontal}>
+          <FormGrid columns={3} className="xl:grid-cols-5">
+            <DatePicker label="Desde" name="desde" defaultValue={aISO(desde)} max={aISO(hoy)} />
+            <DatePicker label="Hasta" name="hasta" defaultValue={aISO(hasta)} max={aISO(hoy)} />
+            <Select
+              label="Forma de pago"
+              name="metodo"
+              defaultValue={sp.metodo ?? ""}
+              placeholder="Todas"
+              options={Object.entries(METODOS_PAGO).map(([k, v]) => ({ value: k, label: v }))}
+            />
+            <Select
+              label="Quién vendió"
+              name="vendedor"
+              defaultValue={sp.vendedor ?? ""}
+              placeholder="Todos"
+              options={usuarios.map((u) => ({ value: u.id, label: u.nombre }))}
+            />
+            <Select
+              label="Estado"
+              name="estado"
+              defaultValue={sp.estado ?? ""}
+              placeholder="Todas"
+              options={Object.entries(ESTADOS).map(([value, label]) => ({ value, label }))}
+            />
+          </FormGrid>
+          <Button type="submit" icon={Search} className="mt-4">
+            Aplicar filtros
+          </Button>
+        </Disclosure>
 
-      <div className="card">
-        {ventas.length === 0 ? (
-          <Vacio texto="No hay facturas en estas fechas.">
-            <Link href="/ventas/nueva" className="btn-primary">Hacer una venta</Link>
-          </Vacio>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {ventas.map((v) => {
-              const anulada = v.estado === "ANULADA";
-              return (
-                <li key={v.id}>
-                  <Link href={`/ventas/${v.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-stone-50">
-                    <div className="min-w-0 flex-1">
-                      <p className={clsx("truncate text-lg font-semibold", anulada && "text-stone-400 line-through")}>
-                        {v.items.map((i) => i.categoria.nombre).join(", ")}
-                      </p>
-                      <p className="text-base text-stone-500">
-                        {cuando(v.fecha)} · {v.numero} · {METODOS_PAGO[v.metodoPago]}
-                        {v.clienteNombre && ` · ${v.clienteNombre}`}
-                        {!localId && ` · ${v.local.nombre}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={clsx("text-xl font-bold tabular-nums", anulada && "text-stone-400 line-through")}>{cop(v.total)}</p>
-                      {anulada ? (
-                        <p className="text-sm font-bold text-red-700">ANULADA</p>
-                      ) : (
-                        <p className="text-sm text-stone-500">{gramos(v.items.reduce((a, i) => a + i.pesoCg, 0))}</p>
-                      )}
-                    </div>
-                    <ChevronRight className="h-6 w-6 shrink-0 text-stone-400" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+        {filtrosActivos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filtrosActivos.map((f) => (
+              <RemovableChip key={f.texto} href={f.href}>
+                {f.texto}
+              </RemovableChip>
+            ))}
+            {filtrosActivos.length > 1 && (
+              <Button variant="link" href="/ventas">
+                Quitar todos
+              </Button>
+            )}
+          </div>
         )}
-      </div>
-    </div>
+      </form>
+
+      <StatPanel>
+        <Stat label="Facturas" value={activas.length} detail={anuladas > 0 ? `sin contar ${plural(anuladas, "anulada", "anuladas")}` : undefined} />
+        <Stat label="Total vendido" value={cop(total)} />
+        <Stat label="Peso vendido" value={gramos(peso)} />
+      </StatPanel>
+
+      <Card>
+        {ventas.length === 0 ? (
+          otrosFiltros ? (
+            <EmptyState icon={Receipt} title="No hay facturas con estos filtros.">
+              <Button variant="secondary" href="/ventas">
+                Quitar los filtros
+              </Button>
+            </EmptyState>
+          ) : (
+            <EmptyState icon={Receipt} title="No hay facturas en estas fechas.">
+              <Button href="/ventas/nueva" icon={ShoppingBag}>
+                Hacer una venta
+              </Button>
+            </EmptyState>
+          )
+        ) : (
+          <>
+            <div className="hidden lg:block">
+              <VentasTabla grupos={grupos} porDia={variosDias} mostrarLocal={!localId} />
+            </div>
+            <div className="lg:hidden">
+              {grupos.map((g, i) => (
+                <section key={g.iso} aria-label={variosDias ? g.titulo : undefined} className={i > 0 ? "border-t border-neutral-200" : undefined}>
+                  {variosDias && (
+                    <div className={`flex items-baseline justify-between gap-3 bg-neutral-50 px-5 py-3 ${i === 0 ? "rounded-t-2xl" : ""}`}>
+                      <h2 className="text-base font-bold text-neutral-800">{g.titulo}</h2>
+                      <p className="text-base font-semibold tabular-nums text-neutral-600">{cop(g.total)}</p>
+                    </div>
+                  )}
+                  <List>
+                    {g.ventas.map((v) => (
+                      <VentaFila key={v.id} venta={v} mostrarLocal={!localId} soloHora={variosDias} />
+                    ))}
+                  </List>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {ventas.length === LIMITE && (
+        <p className="text-center text-base text-neutral-500">
+          Se muestran las {LIMITE} facturas más recientes. Use los filtros para encontrar otras.
+        </p>
+      )}
+    </PageContainer>
   );
 }

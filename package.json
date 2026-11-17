@@ -12,7 +12,6 @@
     "verificar": "tsx scripts/verificar.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma migrate deploy && next build"
-
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,6 +27,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "recharts": "^2.15.4",
+    "tailwind-merge": "^2.6.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

@@ -31,6 +31,29 @@ Para volver a dejar los datos de ejemplo como al inicio: `npm run db:reset`.
 - **Arqueo diario**: toma el saldo del sistema; se digita lo contado y marca **OK / FALTA / SOBRA** en verde/rojo. Al cerrar, el admin puede aplicar las diferencias como ajuste al inventario.
 - **Traslados** entre locales, **Reportes** (cierre del día o rango, exportación CSV para Excel) y **Administración** (categorías y precios por gramo, locales, usuarios).
 
+## Sistema de diseño (frontend)
+
+Todas las pantallas se arman con componentes reutilizables; las vistas no definen botones, tarjetas, campos ni colores propios. Catálogo en vivo: **/admin/componentes** (solo administrador).
+
+```
+src/
+├── styles/tokens.ts        Colores de marca (única fuente de verdad; Tailwind y gráficos los leen)
+├── components/
+│   ├── ui/                 Sistema de diseño genérico — importar siempre desde "@/components/ui"
+│   ├── layout/             Menú lateral, barra inferior, selector de local, mapa de módulos
+│   ├── filtros/            Filtro de rango de fechas y navegador de días
+│   ├── ventas/, arqueo/    Piezas de dominio que se repiten en varias pantallas
+│   └── graficos/           Gráficos (Recharts)
+└── app/                    Páginas: solo datos + composición de componentes
+```
+
+- **Paleta de la marca** (monocromática): `#020202`, `#A6A6A6`, `#D9D9D9` y `#FFFFFF`, definida en `src/styles/tokens.ts`. `neutral` es la escala de grises (textos, bordes, fondos) y `brand` el negro de la marca (acciones y selección). `#A6A6A6` no se usa para texto: no se lee bien sobre blanco.
+- **Colores de estado**: `success` (cuadra, ingresos), `danger` (faltantes, gastos, anulaciones), `warning` (pendientes) e `info` (ayudas), solo en insignias, avisos y cifras. Los componentes reciben `tone="success"`, nunca un color directo.
+- **Componentes de `ui/`**: `Button` (variantes, tamaños, ícono, `loading`, y `href` para enlaces), `Card`/`CardHeader`/`CardLink`, `Modal` y `ConfirmButton`, `Icon`/`IconBadge` (escala única de tamaños), `Calendar`/`DatePicker`, `Input`/`Select`/`Textarea`/`Checkbox`/`PasswordInput`, `GramsInput`/`MoneyInput`/`QuantityStepper`, `ChoiceTile`/`Chip`, `StatCard`, `DataRow`, `List`/`ListItem`, `Table`/`Th`/`Td`, `Badge`/`StatusBadge`, `Alert`, `EmptyState`, `Stepper`, `ProgressBar`, `Pagination`, `PageHeader`/`Section`/`PageContainer`.
+- **Regla**: si una pantalla necesita algo que no existe, se agrega en `src/components/ui` (o en una carpeta de dominio si es específico del negocio) y se muestra en `/admin/componentes`.
+- Los botones son `type="button"` por defecto: para enviar un formulario use `type="submit"`.
+- Desde una página del servidor no se pueden pasar componentes de ícono a componentes de cliente: en `ConfirmButton` el ícono se pasa ya renderizado (`icon={<Icon icon={Ban} />}`).
+
 ## Notas técnicas
 
 - Next.js 15 (App Router, Server Actions) + Prisma + SQLite + Tailwind + Recharts.

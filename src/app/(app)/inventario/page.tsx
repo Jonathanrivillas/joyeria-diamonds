@@ -1,17 +1,19 @@
 import Link from "next/link";
-import clsx from "clsx";
-import { PackagePlus, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, PackagePlus, ChevronRight } from "lucide-react";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { planillaDelDia } from "@/lib/consultas";
-import { aISO, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
-import { gramos, entero, fechaLarga } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
+import { aISO, inicioDia, parseFechaISO } from "@/lib/fechas";
+import { gramos, entero, plural } from "@/lib/format";
+import { Button, Card, Icon, NoValue, PageContainer, PageHeader, Stat, StatPanel, Table, Td, Th, Tr, cn } from "@/components/ui";
+import { NavegadorDia } from "@/components/filtros/navegador-dia";
 
-export default async function InventarioPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ fecha?: string }>;
-}) {
+/** Columna "Queda": el dato principal, resaltado como en la planilla de papel. */
+const QUEDA = "bg-neutral-100/70";
+const QUEDA_TITULO = "bg-neutral-200 text-neutral-900";
+/** Fila de totales: separada con una línea gruesa arriba. */
+const TOTAL = "border-t-2 border-t-neutral-500 border-b-0 py-4";
+
+export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ fecha?: string }> }) {
   const sp = await searchParams;
   const s = await requireSesion();
   const { localId, locales } = await getAlcance(s);
@@ -33,114 +35,150 @@ export default async function InventarioPage({
   );
 
   const nombreLocal = localId ? locales.find((l) => l.id === localId)?.nombre : "Todos los locales";
+  const md = "hidden md:table-cell";
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <PageContainer width="fluid">
       <PageHeader
-        titulo="Inventario"
-        subtitulo={nombreLocal}
-        ayuda="Es la misma planilla del papel: lo que entró, lo que salió y lo que queda de cada tipo de pieza. Toque una categoría para ver todos sus movimientos."
-      >
-        {s.rol === "ADMIN" && (
-          <Link href="/inventario/entradas" className="btn-primary">
-            <PackagePlus className="h-5 w-5" /> Ingresar mercancía
-          </Link>
-        )}
-      </PageHeader>
+        title="Inventario"
+        subtitle={nombreLocal}
+        help="Es la misma planilla del papel: lo que entró, lo que salió y lo que queda de cada tipo de pieza. Toque una categoría para ver todos sus movimientos."
+        actions={
+          s.rol === "ADMIN" && (
+            <Button href="/inventario/entradas" icon={PackagePlus}>
+              Ingresar mercancía
+            </Button>
+          )
+        }
+      />
 
-      {/* Día */}
-      <div className="no-print mb-5 flex flex-wrap items-center gap-3">
-        <Link href={`/inventario?fecha=${aISO(sumarDias(dia, -1))}`} className="btn-secondary">← Día anterior</Link>
-        <p className="text-xl font-bold">{esHoy ? `Hoy, ${fechaLarga(dia).toLowerCase()}` : fechaLarga(dia)}</p>
-        {!esHoy && (
-          <>
-            <Link href={`/inventario?fecha=${aISO(sumarDias(dia, 1))}`} className="btn-secondary">Día siguiente →</Link>
-            <Link href="/inventario" className="btn-secondary">Volver a hoy</Link>
-          </>
-        )}
-        <form className="ml-auto flex items-center gap-2">
-          <input type="date" name="fecha" defaultValue={aISO(dia)} max={aISO(hoy)} className="input w-auto" aria-label="Escoger fecha" />
-          <button className="btn-secondary">Ver ese día</button>
-        </form>
-      </div>
+      <NavegadorDia ruta="/inventario" fecha={aISO(dia)} hoy={aISO(hoy)} />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <div className="card border-2 border-oro-300 bg-oro-50 p-5">
-          <p className="text-base text-stone-700">{esHoy ? "Hay en este momento" : "Quedó al final del día"}</p>
-          <p className="text-2xl font-bold text-oro-900 tabular-nums">{gramos(tot.p)}</p>
-          <p className="text-base text-stone-600">{entero(tot.c)} piezas</p>
-        </div>
-        <div className="card p-5">
-          <p className="text-base text-stone-600">Entró {esHoy ? "hoy" : "ese día"}</p>
-          <p className="text-2xl font-bold text-emerald-700 tabular-nums">{gramos(tot.ep)}</p>
-          <p className="text-base text-stone-500">{entero(tot.ec)} piezas</p>
-        </div>
-        <div className="card p-5">
-          <p className="text-base text-stone-600">Salió {esHoy ? "hoy" : "ese día"}</p>
-          <p className="text-2xl font-bold text-red-700 tabular-nums">{gramos(tot.sp)}</p>
-          <p className="text-base text-stone-500">{entero(tot.sc)} piezas</p>
-        </div>
-      </div>
+      <StatPanel>
+        <Stat label={esHoy ? "Hay en este momento" : "Quedó al final del día"} value={gramos(tot.p)} detail={`${entero(tot.c)} piezas`} />
+        <Stat
+          label={`Entró ${esHoy ? "hoy" : "ese día"}`}
+          value={gramos(tot.ep)}
+          detail={plural(tot.ec, "pieza", "piezas")}
+          tone={tot.ep > 0 || tot.ec > 0 ? "success" : "neutral"}
+        />
+        <Stat
+          label={`Salió ${esHoy ? "hoy" : "ese día"}`}
+          value={gramos(tot.sp)}
+          detail={plural(tot.sc, "pieza", "piezas")}
+          tone={tot.sp > 0 || tot.sc > 0 ? "danger" : "neutral"}
+        />
+      </StatPanel>
 
-      <div className="card overflow-x-auto">
-        <table className="tabla">
+      <Card>
+        <Table stickyHeader>
           <thead>
             <tr>
-              <th rowSpan={2} className="align-bottom">Categoría</th>
-              <th colSpan={2} className="hidden text-center md:table-cell">Entró</th>
-              <th colSpan={2} className="hidden text-center md:table-cell">Salió</th>
-              <th colSpan={2} className="text-center !bg-oro-100 !text-oro-900">Queda</th>
-              <th rowSpan={2} className="no-print w-8"></th>
+              <Th rowSpan={2} sticky className="align-bottom">
+                Categoría
+              </Th>
+              <Th colSpan={2} center divider className={md}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon icon={ArrowDown} size="sm" className="text-success-600" /> Entró
+                </span>
+              </Th>
+              <Th colSpan={2} center divider className={md}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon icon={ArrowUp} size="sm" className="text-danger-600" /> Salió
+                </span>
+              </Th>
+              <Th colSpan={2} center divider="strong" className={cn(QUEDA_TITULO, "text-lg")}>
+                Queda
+              </Th>
+              <Th rowSpan={2} className="no-print w-10" />
             </tr>
             <tr>
-              <th className="num hidden md:table-cell">Gramos</th>
-              <th className="num hidden md:table-cell">Piezas</th>
-              <th className="num hidden md:table-cell">Gramos</th>
-              <th className="num hidden md:table-cell">Piezas</th>
-              <th className="num !bg-oro-100 !text-oro-900">Gramos</th>
-              <th className="num !bg-oro-100 !text-oro-900">Piezas</th>
+              <Th numeric divider className={md}>
+                Gramos
+              </Th>
+              <Th numeric className={md}>
+                Piezas
+              </Th>
+              <Th numeric divider className={md}>
+                Gramos
+              </Th>
+              <Th numeric className={md}>
+                Piezas
+              </Th>
+              <Th numeric divider="strong" className={QUEDA_TITULO}>
+                Gramos
+              </Th>
+              <Th numeric className={QUEDA_TITULO}>
+                Piezas
+              </Th>
             </tr>
           </thead>
           <tbody>
             {filas.map((f) => {
               const href = `/inventario/${f.categoriaId}`;
               return (
-                <tr key={f.categoriaId} className="cursor-pointer">
-                  <td>
-                    <Link href={href} className="block font-semibold text-stone-900 hover:text-oro-800 hover:underline">
+                <Tr key={f.categoriaId}>
+                  <Td sticky>
+                    <Link href={href} className="block font-semibold text-neutral-900 hover:underline">
                       {f.nombre}
                     </Link>
-                    {!f.controlaPeso && <span className="text-sm text-stone-500">Se cuenta por piezas</span>}
-                  </td>
-                  <td className="num hidden text-emerald-700 md:table-cell">{f.entradaPeso ? gramos(f.entradaPeso, false) : ""}</td>
-                  <td className="num hidden text-emerald-700 md:table-cell">{f.entradaCant || ""}</td>
-                  <td className="num hidden text-red-700 md:table-cell">{f.salidaPeso ? gramos(f.salidaPeso, false) : ""}</td>
-                  <td className="num hidden text-red-700 md:table-cell">{f.salidaCant || ""}</td>
-                  <td className={clsx("num bg-oro-50/60 text-lg font-bold")}>{f.controlaPeso ? gramos(f.saldoPeso, false) : "—"}</td>
-                  <td className="num bg-oro-50/60 text-lg font-bold">{entero(f.saldoCant)}</td>
-                  <td className="no-print">
+                    {!f.controlaPeso && <span className="text-sm text-neutral-500">Se cuenta por piezas</span>}
+                  </Td>
+                  <Td numeric divider className={cn(md, "text-success-700")}>
+                    {f.entradaPeso ? gramos(f.entradaPeso, false) : <NoValue />}
+                  </Td>
+                  <Td numeric className={cn(md, "text-success-700")}>
+                    {f.entradaCant || <NoValue />}
+                  </Td>
+                  <Td numeric divider className={cn(md, "text-danger-700")}>
+                    {f.salidaPeso ? gramos(f.salidaPeso, false) : <NoValue />}
+                  </Td>
+                  <Td numeric className={cn(md, "text-danger-700")}>
+                    {f.salidaCant || <NoValue />}
+                  </Td>
+                  <Td numeric divider="strong" className={cn(QUEDA, "text-lg font-bold")}>
+                    {f.controlaPeso ? gramos(f.saldoPeso, false) : <NoValue label="Se cuenta por piezas" />}
+                  </Td>
+                  <Td numeric className={cn(QUEDA, "text-lg font-bold")}>
+                    {entero(f.saldoCant)}
+                  </Td>
+                  <Td className="no-print">
                     <Link href={href} aria-label={`Ver movimientos de ${f.nombre}`}>
-                      <ChevronRight className="h-5 w-5 text-stone-400" />
+                      <Icon icon={ChevronRight} className="text-neutral-400" />
                     </Link>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               );
             })}
           </tbody>
           <tfoot>
-            <tr className="text-lg font-bold">
-              <td className="px-4 py-4">TOTAL</td>
-              <td className="num hidden px-4 md:table-cell">{gramos(tot.ep, false)}</td>
-              <td className="num hidden px-4 md:table-cell">{entero(tot.ec)}</td>
-              <td className="num hidden px-4 md:table-cell">{gramos(tot.sp, false)}</td>
-              <td className="num hidden px-4 md:table-cell">{entero(tot.sc)}</td>
-              <td className="num bg-oro-100 px-4 text-oro-900">{gramos(tot.p)}</td>
-              <td className="num bg-oro-100 px-4 text-oro-900">{entero(tot.c)}</td>
-              <td className="no-print"></td>
+            <tr className="bg-neutral-50 text-lg font-bold">
+              <Td sticky className={cn("bg-neutral-50 group-hover:bg-neutral-50", TOTAL)}>
+                Total
+              </Td>
+              <Td numeric divider className={cn(md, TOTAL)}>
+                {gramos(tot.ep, false)}
+              </Td>
+              <Td numeric className={cn(md, TOTAL)}>
+                {entero(tot.ec)}
+              </Td>
+              <Td numeric divider className={cn(md, TOTAL)}>
+                {gramos(tot.sp, false)}
+              </Td>
+              <Td numeric className={cn(md, TOTAL)}>
+                {entero(tot.sc)}
+              </Td>
+              <Td numeric divider="strong" className={cn(QUEDA_TITULO, TOTAL)}>
+                {gramos(tot.p)}
+              </Td>
+              <Td numeric className={cn(QUEDA_TITULO, TOTAL)}>
+                {entero(tot.c)}
+              </Td>
+              <Td className={cn("no-print", TOTAL)} />
             </tr>
           </tfoot>
-        </table>
-      </div>
-    </div>
+        </Table>
+      </Card>
+    </PageContainer>
   );
 }

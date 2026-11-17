@@ -1,64 +1,55 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Gem, Eye, EyeOff, LogIn } from "lucide-react";
+import Image from "next/image";
+import { LogIn } from "lucide-react";
+import { Alert, Button, Card, Input, Logo, PasswordInput } from "@/components/ui";
 import { login } from "./actions";
 
 export default function LoginPage() {
   const [estado, accion, pendiente] = useActionState(login, undefined);
+  // Controlados: React limpia el formulario al enviarlo y no queremos perder lo escrito si hay error.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [ver, setVer] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-stone-900 via-stone-800 to-oro-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-800 p-4">
       <div className="w-full max-w-lg">
         <div className="mb-6 flex flex-col items-center text-center text-white">
-          <div className="mb-3 rounded-full bg-oro-500/20 p-4 ring-1 ring-oro-400/40">
-            <Gem className="h-10 w-10 text-oro-300" />
-          </div>
-          <h1 className="text-2xl font-bold">Joyería</h1>
-          <p className="text-lg text-stone-300">Inventario, ventas y arqueo</p>
+          <Logo size="xl" priority className="mb-4" />
+          <h1>
+            <Image src="/nombre-diamonds.png" alt="Joyería Diamonds" width={2172} height={300} priority className="h-auto w-72" />
+          </h1>
         </div>
 
-        <form action={accion} className="card space-y-5 p-6 sm:p-8">
-          <h2 className="text-2xl font-bold">Entrar</h2>
-          <div>
-            <label className="label" htmlFor="email">Su correo</label>
-            <input id="email" name="email" type="email" required className="input text-lg" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
-          </div>
-          <div>
-            <label className="label" htmlFor="password">Su contraseña</label>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type={ver ? "text" : "password"}
-                required
-                className="input pr-32 text-lg"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setVer((v) => !v)}
-                className="absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-lg px-3 py-2 text-base font-medium text-stone-600 hover:bg-stone-100"
-              >
-                {ver ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                {ver ? "Ocultar" : "Ver"}
-              </button>
-            </div>
-          </div>
-          {estado?.error && (
-            <p role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-base font-medium text-red-800">
-              {estado.error}
-            </p>
-          )}
-          <button className="btn-primary btn-grande w-full" disabled={pendiente}>
-            <LogIn className="h-6 w-6" /> {pendiente ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+        <Card padding="lg">
+          <form action={accion} className="space-y-5">
+            <h2 className="text-2xl font-bold">Entrar</h2>
+            <Input
+              label="Su correo"
+              name="email"
+              type="email"
+              required
+              size="lg"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <PasswordInput
+              label="Su contraseña"
+              name="password"
+              required
+              size="lg"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {estado?.error && <Alert tone="danger">{estado.error}</Alert>}
+            <Button type="submit" size="lg" block icon={LogIn} loading={pendiente} loadingText="Entrando...">
+              Entrar
+            </Button>
+          </form>
+        </Card>
       </div>
     </div>
   );

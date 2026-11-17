@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireSesion } from "@/lib/session";
 import { fechaHora } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
-import { BotonImprimir } from "@/components/boton-imprimir";
+import { PageContainer, PageHeader, PrintButton } from "@/components/ui";
 import { ArqueoForm } from "./arqueo-form";
 
 export default async function ArqueoDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,19 +21,18 @@ export default async function ArqueoDetallePage({ params }: { params: Promise<{ 
   const cerrado = a.estado === "CERRADO";
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <PageContainer width="fluid">
       <PageHeader
-        titulo={cerrado ? "Resultado del arqueo" : "Arqueo del día"}
-        subtitulo={`${a.local.nombre} · ${fechaHora(a.fecha)} · ${a.usuario.nombre}`}
-        volver={{ href: "/arqueo", texto: "Volver a los arqueos" }}
-        ayuda={
+        title={cerrado ? "Resultado del arqueo" : "Arqueo del día"}
+        subtitle={`${a.local.nombre} · ${fechaHora(a.fecha)} · ${a.usuario.nombre}`}
+        back={{ href: "/arqueo", label: "Volver a los arqueos" }}
+        help={
           cerrado
             ? undefined
             : "Cuente cada tipo de pieza. Si lo que contó es igual a lo que dice el sistema, toque «Está igual». Si no, toque «Es diferente» y escriba lo que contó."
         }
-      >
-        {cerrado && <BotonImprimir />}
-      </PageHeader>
+        actions={cerrado && <PrintButton />}
+      />
       <ArqueoForm
         arqueoId={a.id}
         cerrado={cerrado}
@@ -52,6 +50,6 @@ export default async function ArqueoDetallePage({ params }: { params: Promise<{ 
           observacion: d.observacion ?? "",
         }))}
       />
-    </div>
+    </PageContainer>
   );
 }

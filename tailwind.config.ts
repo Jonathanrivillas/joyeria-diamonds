@@ -1,22 +1,25 @@
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
+import { brand, gris } from "./src/styles/tokens";
 
+// Ver src/styles/tokens.ts para el significado de cada color.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        oro: {
-          50: "#fbf8ef",
-          100: "#f4ecd2",
-          200: "#e8d6a1",
-          300: "#dbbd6c",
-          400: "#d0a645",
-          500: "#b98a30",
-          600: "#9a6c27",
-          700: "#7a5123",
-          800: "#654323",
-          900: "#563921",
-        },
+        neutral: gris,
+        brand,
+        success: colors.emerald,
+        danger: colors.red,
+        warning: colors.amber,
+        info: colors.sky,
+      },
+      keyframes: {
+        aparecer: { from: { opacity: "0", transform: "translateY(4px)" }, to: { opacity: "1", transform: "none" } },
+      },
+      animation: {
+        aparecer: "aparecer 150ms ease-out",
       },
     },
   },

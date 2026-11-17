@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
-import { PageHeader } from "@/components/ui";
+import { PageContainer } from "@/components/ui";
 import { VentaForm } from "./venta-form";
 
 export default async function NuevaVentaPage() {
@@ -12,8 +12,7 @@ export default async function NuevaVentaPage() {
   ]);
 
   return (
-    <div>
-      <PageHeader titulo="Vender" volver={{ href: "/", texto: "Volver al inicio" }} />
+    <PageContainer width="fluid">
       <VentaForm
         esAdmin={s.rol === "ADMIN"}
         locales={locales.map((l) => ({ id: l.id, nombre: l.nombre }))}
@@ -31,6 +30,6 @@ export default async function NuevaVentaPage() {
           cantidad: e.cantidad,
         }))}
       />
-    </div>
+    </PageContainer>
   );
 }

@@ -1,7 +1,8 @@
+import { PackageOpen } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin, getAlcance } from "@/lib/session";
 import { gramos, fechaHora } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
+import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr } from "@/components/ui";
 import { EntradaForm } from "./entrada-form";
 
 export default async function EntradasPage() {
@@ -18,11 +19,11 @@ export default async function EntradasPage() {
   ]);
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        titulo="Ingresar mercancía"
-        volver={{ href: "/inventario", texto: "Volver al inventario" }}
-        ayuda="Use esto cuando llegan piezas nuevas al local. Se suman al inventario."
+        title="Ingresar mercancía"
+        back={{ href: "/inventario", label: "Volver al inventario" }}
+        help="Use esto cuando llegan piezas nuevas al local. Se suman al inventario."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
         <EntradaForm
@@ -30,34 +31,38 @@ export default async function EntradasPage() {
           localDefecto={localId ?? locales[0]?.id}
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre, controlaPeso: c.controlaPeso }))}
         />
-        <div className="card overflow-x-auto">
-          <p className="border-b border-stone-200 px-5 py-4 text-xl font-bold">Últimos ingresos</p>
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Local</th>
-                <th>Categoría</th>
-                <th className="num">Peso</th>
-                <th className="num">Cant.</th>
-                <th>Nota</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recientes.map((m) => (
-                <tr key={m.id}>
-                  <td className="whitespace-nowrap">{fechaHora(m.fecha)}</td>
-                  <td>{m.local.nombre}</td>
-                  <td>{m.categoria.nombre}</td>
-                  <td className="num">{gramos(m.pesoCg)}</td>
-                  <td className="num">{m.cantidad}</td>
-                  <td className="text-xs text-stone-500">{m.nota}</td>
+        <Card>
+          <CardHeader title="Últimos ingresos" />
+          {recientes.length === 0 ? (
+            <EmptyState icon={PackageOpen} title="Todavía no se ha ingresado mercancía." />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th>Local</Th>
+                  <Th>Categoría</Th>
+                  <Th numeric>Peso</Th>
+                  <Th numeric>Cant.</Th>
+                  <Th>Nota</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recientes.map((m) => (
+                  <Tr key={m.id}>
+                    <Td className="whitespace-nowrap">{fechaHora(m.fecha)}</Td>
+                    <Td>{m.local.nombre}</Td>
+                    <Td>{m.categoria.nombre}</Td>
+                    <Td numeric>{gramos(m.pesoCg)}</Td>
+                    <Td numeric>{m.cantidad}</Td>
+                    <Td className="text-sm text-neutral-500">{m.nota}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

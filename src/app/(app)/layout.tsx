@@ -1,20 +1,20 @@
-import { requireSesion, getAlcance } from "@/lib/session";
-import { Sidebar } from "@/components/sidebar";
-import { LocalSelector } from "@/components/local-selector";
-import { logout } from "@/app/login/actions";
-import Link from "next/link";
 import { LogOut, KeyRound } from "lucide-react";
-
+import { requireSesion, getAlcance } from "@/lib/session";
+import { Sidebar } from "@/components/layout/sidebar";
+import { LocalSelector } from "@/components/layout/local-selector";
+import { Button } from "@/components/ui";
+import { logout } from "@/app/login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSesion();
   const { localId, locales } = await getAlcance(s);
+  const rol = s.rol === "ADMIN" ? "Administrador" : "Vendedor";
 
   return (
     <div className="flex min-h-screen">
       <Sidebar rol={s.rol} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 sm:px-6">
+        <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
           <LocalSelector
             esAdmin={s.rol === "ADMIN"}
             localId={localId}
@@ -23,16 +23,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-3">
             <p className="hidden text-right sm:block">
               <span className="block font-semibold leading-tight">{s.nombre}</span>
-              <span className="block text-sm text-stone-500">{s.rol === "ADMIN" ? "Administrador" : "Vendedor"}</span>
+              {/* El rol solo si no es lo mismo que el nombre (ej. usuario "Administrador"). */}
+              {rol !== s.nombre && <span className="block text-sm text-neutral-500">{rol}</span>}
             </p>
-            <Link href="/cambiar-clave" className="btn-secondary hidden min-h-[2.75rem] px-4 sm:inline-flex">
-              <KeyRound className="h-5 w-5" /> Mi clave
-            </Link>
-
+            <span className="hidden sm:inline-flex">
+              <Button variant="secondary" href="/cambiar-clave" icon={KeyRound}>
+                Mi clave
+              </Button>
+            </span>
             <form action={logout}>
-              <button className="btn-secondary min-h-[2.75rem] px-4">
-                <LogOut className="h-5 w-5" /> Salir
-              </button>
+              <Button type="submit" variant="secondary" icon={LogOut}>
+                Salir
+              </Button>
             </form>
           </div>
         </header>

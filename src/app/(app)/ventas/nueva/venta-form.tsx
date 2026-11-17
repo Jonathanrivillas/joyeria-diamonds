@@ -2,23 +2,36 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import clsx from "clsx";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Banknote,
-  Check,
-  CreditCard,
-  Plus,
-  Smartphone,
-  Trash2,
-  Pencil,
-  ShoppingBag,
-} from "lucide-react";
+import { ArrowRight, Banknote, Check, CreditCard, Plus, Search, SearchX, Smartphone, Trash2, Pencil, ShoppingBag, UserPlus } from "lucide-react";
+import { publicarLocalVenta } from "@/components/ventas/local-venta";
 import { crearVenta } from "../actions";
 import { cop, gramos, parseGramos } from "@/lib/format";
-import { Aviso } from "@/components/ui";
-import { CampoDinero, CampoGramos, Contador } from "@/components/campos";
+import {
+  Alert,
+  BackLink,
+  Button,
+  ActionBar,
+  Card,
+  CardFooter,
+  Checkbox,
+  ChoiceGrid,
+  ChoiceTile,
+  Chip,
+  ChipGroup,
+  EmptyState,
+  FormGrid,
+  GramsInput,
+  Icon,
+  Input,
+  List,
+  LeaveGuard,
+  ListItem,
+  MoneyInput,
+  PageHeader,
+  QuantityStepper,
+  Section,
+  Stepper,
+} from "@/components/ui";
 
 type Cat = { id: number; nombre: string; controlaPeso: boolean; precio: number };
 type Ex = { localId: number; categoriaId: number; pesoCg: number; cantidad: number };
@@ -42,6 +55,8 @@ const METODOS: { id: Metodo; nombre: string; icon: typeof Banknote }[] = [
 ];
 
 let siguienteKey = 1;
+
+const piezas = (n: number) => `${n} ${n === 1 ? "pieza" : "piezas"}`;
 
 function calcular(c: Cat, pesoCg: number, cantidad: number, precio: number, hechura: number) {
   return c.controlaPeso ? Math.round((pesoCg / 100) * precio) + hechura : precio * cantidad + hechura;
@@ -83,6 +98,15 @@ export function VentaForm({
   const [verCliente, setVerCliente] = useState(false);
   const [cliente, setCliente] = useState("");
   const [documento, setDocumento] = useState("");
+
+  const [buscar, setBuscar] = useState("");
+
+  // La barra superior muestra el local de esta venta.
+  const nombreLocal = locales.find((l) => l.id === localId)?.nombre ?? null;
+  useEffect(() => {
+    publicarLocalVenta(nombreLocal);
+    return () => publicarLocalVenta(null);
+  }, [nombreLocal]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -168,308 +192,315 @@ export function VentaForm({
     });
   }
 
-  const pasoNum = paso === "cobrar" ? 2 : 1;
+  const paso3 = paso === "cobrar" ? 3 : paso === "resumen" ? 2 : 1;
+  const agotado = (c: Cat) => {
+    const d = disponible(c.id);
+    return d.cantidad <= 0 || (c.controlaPeso && d.pesoCg <= 0);
+  };
+  // Lo disponible primero; lo agotado al final.
+  const sinTildes = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  const filtro = sinTildes(buscar.trim());
+  const categoriasOrden = [...categorias]
+    .sort((a, b) => Number(agotado(a)) - Number(agotado(b)))
+    .filter((c) => !filtro || sinTildes(c.nombre).includes(filtro));
+  const conBuscador = categorias.length > 9;
+  const elegirLocal = esAdmin && locales.length > 1;
+  const resumenCarrito = (
+    <p>
+      <span className="font-semibold">{piezas(carrito.length)}</span>
+      <span className="text-neutral-500"> · </span>
+      <span className="font-bold tabular-nums">{cop(total)}</span>
+    </p>
+  );
 
   return (
-    <div className="mx-auto max-w-4xl">
-      {/* Indicador de pasos */}
-      <ol className="mb-6 flex items-center gap-3 text-base font-semibold">
-        {["Escoger las piezas", "Cobrar"].map((t, i) => (
-          <li key={t} className="flex items-center gap-3">
-            <span
-              className={clsx(
-                "flex h-9 w-9 items-center justify-center rounded-full text-lg",
-                pasoNum > i + 1 ? "bg-emerald-600 text-white" : pasoNum === i + 1 ? "bg-oro-700 text-white" : "bg-stone-200 text-stone-500"
-              )}
-            >
-              {pasoNum > i + 1 ? <Check className="h-5 w-5" /> : i + 1}
-            </span>
-            <span className={pasoNum === i + 1 ? "text-stone-900" : "text-stone-400"}>{t}</span>
-            {i === 0 && <span className="h-0.5 w-8 bg-stone-300" />}
-          </li>
-        ))}
-      </ol>
-
-      {error && (
-        <div className="mb-4">
-          <Aviso tipo="error">{error}</Aviso>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Vender"
+        back={{ href: "/", label: "Volver al inicio", mobileOnly: true }}
+        actions={
+          elegirLocal && (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-lg font-semibold text-neutral-700">Vendiendo en:</span>
+              <ChipGroup>
+                {locales.map((l) => (
+                  <Chip key={l.id} selected={localId === l.id} disabled={carrito.length > 0} onClick={() => setLocalId(l.id)}>
+                    {l.nombre}
+                  </Chip>
+                ))}
+              </ChipGroup>
+            </div>
+          )
+        }
+      />
+      {elegirLocal && carrito.length > 0 && paso === "elegir" && (
+        <p className="-mt-4 text-base text-neutral-500">Para cambiar de local, primero quite las piezas de la venta.</p>
       )}
 
-      {/* PASO: elegir categoría */}
+      <LeaveGuard
+        when={carrito.length > 0 && !pendiente}
+        title="¿Salir sin terminar la venta?"
+        message={`La venta tiene ${piezas(carrito.length)} sin cobrar. Si sale, se pierden.`}
+        stayLabel="No, seguir con la venta"
+        leaveLabel="Sí, salir"
+      />
+
+      <Stepper steps={["Piezas", "Revisar", "Cobrar"]} current={paso3} />
+
+      {error && <Alert tone="danger">{error}</Alert>}
+
+      {/* PASO 1: escoger el tipo de pieza */}
       {paso === "elegir" && (
         <div className="space-y-5">
-          {esAdmin && (
-            <div className="card p-5">
-              <label className="label">¿En qué local está vendiendo?</label>
-              <div className="flex flex-wrap gap-3">
-                {locales.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    disabled={carrito.length > 0}
-                    onClick={() => setLocalId(l.id)}
-                    className={clsx("btn", localId === l.id ? "bg-oro-700 text-white" : "border-2 border-stone-300 bg-white")}
-                  >
-                    {localId === l.id && <Check className="h-5 w-5" />} {l.nombre}
-                  </button>
-                ))}
-              </div>
-              {carrito.length > 0 && <p className="ayuda">Para cambiar de local, primero quite las piezas de la venta.</p>}
-            </div>
-          )}
-
-          <div>
-            <h2 className="text-2xl font-bold">¿Qué va a vender?</h2>
-            <p className="text-lg text-stone-600">Toque el tipo de pieza.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            {categorias.map((c) => {
-              const d = disponible(c.id);
-              const agotado = d.cantidad <= 0 || (c.controlaPeso && d.pesoCg <= 0);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={agotado}
-                  onClick={() => elegir(c)}
-                  className="flex min-h-[6rem] flex-col items-start justify-between rounded-2xl border-2 border-stone-200 bg-white p-4 text-left shadow-sm transition hover:border-oro-500 hover:bg-oro-50 active:scale-[0.98] disabled:opacity-40"
-                >
-                  <span className="text-lg font-bold leading-tight">{c.nombre}</span>
-                  <span className="mt-2 text-sm text-stone-500">
-                    {agotado ? "Agotado" : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {carrito.length > 0 && (
-            <div className="sticky bottom-24 lg:bottom-4">
-              <button type="button" className="btn-primary btn-grande w-full shadow-lg" onClick={() => setPaso("resumen")}>
-                <ShoppingBag className="h-6 w-6" /> Volver a la venta ({carrito.length} {carrito.length === 1 ? "pieza" : "piezas"} · {cop(total)})
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* PASO: datos de la pieza */}
-      {paso === "pieza" && cat && (
-        <div className="space-y-5">
-          <button type="button" className="inline-flex items-center gap-2 text-lg font-medium text-oro-800 hover:underline" onClick={() => setPaso("elegir")}>
-            <ArrowLeft className="h-5 w-5" /> Escoger otro tipo de pieza
-          </button>
-          <div className="card space-y-6 p-6">
-            <div>
-              <p className="text-base text-stone-500">Está vendiendo</p>
-              <h2 className="text-2xl font-bold">{cat.nombre}</h2>
-              <p className="text-base text-stone-500">
-                En inventario: {cat.controlaPeso ? `${gramos(disp.pesoCg)} · ` : ""}
-                {disp.cantidad} piezas
-              </p>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {cat.controlaPeso && (
-                <div>
-                  <CampoGramos label="¿Cuánto pesa? (póngala en la balanza)" value={peso} onChange={setPeso} autoFocus grande />
-                  {excedePeso && <p className="mt-1 font-semibold text-red-700">Solo hay {gramos(disp.pesoCg)} en inventario.</p>}
-                </div>
-              )}
-              <div>
-                <Contador label="¿Cuántas piezas?" value={cantidad} onChange={setCantidad} />
-                {excedeCant && <p className="mt-1 font-semibold text-red-700">Solo hay {disp.cantidad} piezas.</p>}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-stone-50 p-4">
-              {!cambiarPrecio ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-lg">
-                    Precio {cat.controlaPeso ? "por gramo" : "por pieza"}: <span className="font-bold">{cop(precio)}</span>
-                  </p>
-                  <button type="button" className="btn-secondary" onClick={() => setCambiarPrecio(true)}>
-                    <Pencil className="h-5 w-5" /> Cambiar precio
-                  </button>
-                </div>
-              ) : (
-                <CampoDinero
-                  label={cat.controlaPeso ? "Precio por gramo" : "Precio por pieza"}
-                  value={precio}
-                  onChange={setPrecio}
-                  autoFocus
-                  ayuda={`El precio normal es ${cop(cat.precio)}. Este cambio es solo para esta pieza.`}
+          <Section
+            title="¿Qué va a vender?"
+            description="Toque el tipo de pieza."
+            action={
+              conBuscador && (
+                <Input
+                  label="Buscar tipo de pieza"
+                  hideLabel
+                  type="search"
+                  value={buscar}
+                  onChange={(e) => setBuscar(e.target.value)}
+                  placeholder="Buscar tipo de pieza…"
+                  prefix={<Icon icon={Search} size="sm" />}
+                  className="pl-12"
+                  containerClassName="w-full sm:w-80"
                 />
-              )}
-            </div>
+              )
+            }
+          >
+            {categoriasOrden.length === 0 && (
+              <EmptyState icon={SearchX} title={`No hay ningún tipo de pieza que se llame “${buscar.trim()}”.`}>
+                <Button variant="secondary" onClick={() => setBuscar("")}>
+                  Ver todos
+                </Button>
+              </EmptyState>
+            )}
+            <ChoiceGrid columns={5}>
+              {categoriasOrden.map((c) => {
+                const d = disponible(c.id);
+                return (
+                  <ChoiceTile
+                    key={c.id}
+                    layout="start"
+                    disabled={agotado(c)}
+                    onClick={() => elegir(c)}
+                    title={c.nombre}
+                    description={agotado(c) ? "Agotado" : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
+                  />
+                );
+              })}
+            </ChoiceGrid>
+          </Section>
 
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setConHechura((v) => !v)}
-                className={clsx("btn w-full justify-start border-2 sm:w-auto", conHechura ? "border-oro-600 bg-oro-50 text-oro-900" : "border-stone-300 bg-white")}
-              >
-                <span className={clsx("flex h-6 w-6 items-center justify-center rounded-md border-2", conHechura ? "border-oro-700 bg-oro-700 text-white" : "border-stone-400")}>
-                  {conHechura && <Check className="h-4 w-4" />}
-                </span>
-                Cobrar hechura (mano de obra)
-              </button>
-              {conHechura && <CampoDinero label="Valor de la hechura" value={hechura} onChange={setHechura} />}
-            </div>
-
-            <div>
-              <label className="label">Nota sobre la pieza (si quiere)</label>
-              <input className="input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: cadena lazo de 50 cm" />
-            </div>
-
-            {/* Cuenta explicada */}
-            <div className="rounded-xl border-2 border-oro-200 bg-oro-50 p-5">
-              {cat.controlaPeso ? (
-                <p className="text-lg text-stone-700">
-                  {pesoValido && peso ? gramos(pesoCg) : "__ g"} × {cop(precio)}
-                  {conHechura && hechura > 0 && <> + hechura {cop(hechura)}</>}
-                </p>
-              ) : (
-                <p className="text-lg text-stone-700">
-                  {cantidad} × {cop(precio)}
-                  {conHechura && hechura > 0 && <> + hechura {cop(hechura)}</>}
-                </p>
-              )}
-              <p className="mt-1 text-base text-stone-600">Valor de esta pieza:</p>
-              <p className="text-3xl font-bold text-oro-800 tabular-nums">{cop(subtotal)}</p>
-            </div>
-
-            <button type="button" className="btn-primary btn-grande w-full" onClick={agregar} disabled={!pesoValido}>
-              <Check className="h-6 w-6" /> Agregar a la venta
-            </button>
-          </div>
+          {carrito.length > 0 && (
+            <ActionBar summary={resumenCarrito}>
+              <Button iconRight={ArrowRight} onClick={() => setPaso("resumen")}>
+                Ver la venta
+              </Button>
+            </ActionBar>
+          )}
         </div>
       )}
 
-      {/* PASO: resumen de la venta */}
-      {paso === "resumen" && (
-        <div className="space-y-5">
-          <h2 className="text-2xl font-bold">La venta lleva:</h2>
-          <div className="card divide-y divide-stone-100">
-            {carrito.map((i, n) => {
-              const c = catMap.get(i.categoriaId)!;
-              return (
-                <div key={i.key} className="flex flex-wrap items-center gap-4 p-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-oro-100 text-lg font-bold text-oro-800">{n + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xl font-bold">{c.nombre}</p>
-                    <p className="text-base text-stone-600">
-                      {c.controlaPeso ? `${gramos(i.pesoCg)} · ` : ""}
-                      {i.cantidad} {i.cantidad === 1 ? "pieza" : "piezas"}
-                      {i.hechura > 0 && ` · hechura ${cop(i.hechura)}`}
-                      {i.descripcion && ` · ${i.descripcion}`}
+      {/* PASO 1b: datos de la pieza */}
+      {paso === "pieza" && cat && (
+        <div className="max-w-4xl">
+          <BackLink onClick={() => setPaso("elegir")}>Escoger otro tipo de pieza</BackLink>
+          <Card>
+            <div className="divide-y divide-neutral-200">
+              <div className="p-5 sm:p-6">
+                <p className="text-base text-neutral-500">Está vendiendo</p>
+                <h2 className="text-2xl font-bold">{cat.nombre}</h2>
+                <p className="text-base text-neutral-500">
+                  En inventario: {cat.controlaPeso ? `${gramos(disp.pesoCg)} · ` : ""}
+                  {disp.cantidad} piezas
+                </p>
+              </div>
+
+              <div className="grid gap-6 p-5 sm:p-6 md:grid-cols-2">
+                {cat.controlaPeso && (
+                  <GramsInput
+                    label="¿Cuánto pesa? (póngala en la balanza)"
+                    value={peso}
+                    onChange={setPeso}
+                    autoFocus
+                    size="xl"
+                    error={excedePeso ? `Solo hay ${gramos(disp.pesoCg)} en inventario.` : undefined}
+                  />
+                )}
+                <QuantityStepper
+                  label="¿Cuántas piezas?"
+                  value={cantidad}
+                  onChange={setCantidad}
+                  error={excedeCant ? `Solo hay ${disp.cantidad} piezas.` : undefined}
+                />
+              </div>
+
+              <div className="space-y-5 p-5 sm:p-6">
+                {!cambiarPrecio ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-lg">
+                      Precio {cat.controlaPeso ? "por gramo" : "por pieza"}: <span className="font-bold">{cop(precio)}</span>
                     </p>
-                  </div>
-                  <p className="text-xl font-bold tabular-nums">{cop(i.subtotal)}</p>
-                  <button type="button" className="btn-secondary text-red-700" onClick={() => setCarrito((c) => c.filter((x) => x.key !== i.key))}>
-                    <Trash2 className="h-5 w-5" /> Quitar
-                  </button>
-                </div>
-              );
-            })}
-            {carrito.length === 0 && <p className="p-8 text-center text-lg text-stone-500">No hay piezas. Agregue una.</p>}
-            <div className="flex items-end justify-between bg-stone-50 p-5">
-              <span className="text-lg text-stone-600">
-                Total {pesoTotal > 0 && `(${gramos(pesoTotal)})`}
-              </span>
-              <span className="text-3xl font-bold text-oro-800 tabular-nums">{cop(total)}</span>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button type="button" className="btn-secondary btn-grande" onClick={() => setPaso("elegir")}>
-              <Plus className="h-6 w-6" /> Agregar otra pieza
-            </button>
-            <button type="button" className="btn-primary btn-grande" disabled={carrito.length === 0} onClick={() => setPaso("cobrar")}>
-              Cobrar <ArrowRight className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* PASO: cobrar */}
-      {paso === "cobrar" && (
-        <div className="space-y-5">
-          <button type="button" className="inline-flex items-center gap-2 text-lg font-medium text-oro-800 hover:underline" onClick={() => setPaso("resumen")}>
-            <ArrowLeft className="h-5 w-5" /> Volver a la venta
-          </button>
-          <div className="card p-6 text-center">
-            <p className="text-lg text-stone-600">Total a cobrar</p>
-            <p className="text-4xl font-bold text-oro-800 tabular-nums">{cop(total)}</p>
-            <p className="mt-1 text-base text-stone-500">
-              {carrito.length} {carrito.length === 1 ? "pieza" : "piezas"}
-              {pesoTotal > 0 && ` · ${gramos(pesoTotal)}`}
-            </p>
-          </div>
-
-          <div>
-            <h2 className="mb-3 text-2xl font-bold">¿Cómo le pagan?</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {METODOS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setMetodo(m.id)}
-                  className={clsx(
-                    "flex flex-col items-center gap-2 rounded-2xl border-2 p-5 text-xl font-bold transition active:scale-[0.98]",
-                    metodo === m.id ? "border-oro-700 bg-oro-700 text-white shadow-md" : "border-stone-200 bg-white hover:border-oro-500"
-                  )}
-                >
-                  <m.icon className="h-10 w-10" />
-                  {m.nombre}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {metodo === "EFECTIVO" && (
-            <div className="card space-y-3 p-5">
-              <CampoDinero label="¿Con cuánto le pagan? (para calcular el cambio)" value={recibido} onChange={setRecibido} grande />
-              {recibido > 0 &&
-                (recibido >= total ? (
-                  <div className="rounded-xl bg-emerald-50 p-4 text-center">
-                    <p className="text-lg text-emerald-800">Debe devolver</p>
-                    <p className="text-3xl font-bold text-emerald-800 tabular-nums">{cop(recibido - total)}</p>
+                    <Button variant="secondary" icon={Pencil} onClick={() => setCambiarPrecio(true)}>
+                      Cambiar precio
+                    </Button>
                   </div>
                 ) : (
-                  <p className="rounded-xl bg-red-50 p-4 text-center text-lg font-semibold text-red-700">
-                    Faltan {cop(total - recibido)}
-                  </p>
-                ))}
-            </div>
-          )}
+                  <MoneyInput
+                    label={cat.controlaPeso ? "Precio por gramo" : "Precio por pieza"}
+                    value={precio}
+                    onChange={setPrecio}
+                    autoFocus
+                    hint={`El precio normal es ${cop(cat.precio)}. Este cambio es solo para esta pieza.`}
+                  />
+                )}
+                <div className="space-y-3">
+                  <Checkbox variant="card" label="Cobrar hechura (mano de obra)" checked={conHechura} onChange={(e) => setConHechura(e.target.checked)} />
+                  {conHechura && <MoneyInput label="Valor de la hechura" value={hechura} onChange={setHechura} />}
+                </div>
+                <Input label="Nota sobre la pieza (si quiere)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: cadena lazo de 50 cm" />
+              </div>
 
-          <div className="card p-5">
-            {!verCliente ? (
-              <button type="button" className="text-lg font-medium text-oro-800 hover:underline" onClick={() => setVerCliente(true)}>
-                + Poner el nombre del cliente en la factura (si quiere)
-              </button>
+              {/* Cuenta explicada junto al botón que la confirma */}
+              <div className="flex flex-wrap items-end justify-between gap-4 rounded-b-2xl bg-neutral-50 p-5 sm:p-6">
+                <div>
+                  <p className="text-base text-neutral-600">
+                    Valor de esta pieza · {cat.controlaPeso ? (pesoValido && peso ? gramos(pesoCg) : "__ g") : cantidad} × {cop(precio)}
+                    {conHechura && hechura > 0 && <> + hechura {cop(hechura)}</>}
+                  </p>
+                  <p className="text-3xl font-bold tabular-nums">{cop(subtotal)}</p>
+                </div>
+                <Button size="lg" icon={Check} onClick={agregar} disabled={!pesoValido} className="w-full sm:w-auto">
+                  Agregar a la venta
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* PASO 2: revisar la venta */}
+      {paso === "resumen" && (
+        <Section title="La venta lleva:" className="max-w-4xl">
+          <Card>
+            {carrito.length === 0 ? (
+              <EmptyState icon={ShoppingBag} title="No hay piezas. Agregue una." />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">Nombre del cliente</label>
-                  <input className="input" value={cliente} onChange={(e) => setCliente(e.target.value)} autoFocus />
-                </div>
-                <div>
-                  <label className="label">Cédula</label>
-                  <input className="input" inputMode="numeric" value={documento} onChange={(e) => setDocumento(e.target.value)} />
-                </div>
-                <p className="ayuda sm:col-span-2">
-                  El nombre y la cédula solo se usan para la factura de esta venta (Ley 1581 de 2012).
-                  Pregúntele al cliente si está de acuerdo.
+              <List>
+                {carrito.map((i, n) => {
+                  const c = catMap.get(i.categoriaId)!;
+                  return (
+                    <ListItem
+                      key={i.key}
+                      leading={
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-800">{n + 1}</span>
+                      }
+                      title={c.nombre}
+                      meta={[c.controlaPeso && gramos(i.pesoCg), piezas(i.cantidad), i.hechura > 0 && `hechura ${cop(i.hechura)}`, i.descripcion]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      end={
+                        <div className="flex items-center justify-end gap-2">
+                          <p className="text-xl font-bold tabular-nums">{cop(i.subtotal)}</p>
+                          <Button
+                            variant="ghost"
+                            icon={Trash2}
+                            aria-label={`Quitar ${c.nombre} de la venta`}
+                            title="Quitar de la venta"
+                            className="text-neutral-500 hover:bg-danger-50 hover:text-danger-700"
+                            onClick={() => setCarrito((c) => c.filter((x) => x.key !== i.key))}
+                          />
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </List>
+            )}
+            <CardFooter className="flex items-end justify-between">
+              <span className="text-lg text-neutral-600">Total {pesoTotal > 0 && `(${gramos(pesoTotal)})`}</span>
+              <span className="text-3xl font-bold tabular-nums">{cop(total)}</span>
+            </CardFooter>
+          </Card>
+          <ActionBar>
+            <Button variant="secondary" size="lg" icon={Plus} onClick={() => setPaso("elegir")}>
+              Agregar otra pieza
+            </Button>
+            <Button size="lg" iconRight={ArrowRight} disabled={carrito.length === 0} onClick={() => setPaso("cobrar")}>
+              Cobrar
+            </Button>
+          </ActionBar>
+        </Section>
+      )}
+
+      {/* PASO 3: cobrar */}
+      {paso === "cobrar" && (
+        <div className="max-w-4xl space-y-5">
+          <BackLink onClick={() => setPaso("resumen")}>Volver a la venta</BackLink>
+          <Card>
+            <div className="divide-y divide-neutral-200">
+              <div className="p-6 text-center">
+                <p className="text-lg text-neutral-600">Total a cobrar</p>
+                <p className="text-4xl font-bold tabular-nums">{cop(total)}</p>
+                <p className="mt-1 text-base text-neutral-500">
+                  {piezas(carrito.length)}
+                  {pesoTotal > 0 && ` · ${gramos(pesoTotal)}`}
                 </p>
               </div>
-            )}
-          </div>
 
-          <button type="button" className="btn-primary btn-grande w-full text-xl" disabled={!metodo || pendiente} onClick={confirmar}>
-            <Check className="h-7 w-7" />
-            {pendiente ? "Guardando la venta..." : metodo ? "Confirmar la venta" : "Primero toque la forma de pago"}
-          </button>
+              <div className="space-y-3 p-5 sm:p-6">
+                <h2 className="text-xl font-bold text-neutral-800">¿Cómo le pagan?</h2>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {METODOS.map((m) => (
+                    <ChoiceTile key={m.id} selected={metodo === m.id} onClick={() => setMetodo(m.id)} icon={m.icon} title={m.nombre} className="p-5 text-xl" />
+                  ))}
+                </div>
+              </div>
+
+              {metodo === "EFECTIVO" && (
+                <div className="space-y-3 p-5 sm:p-6">
+                  <MoneyInput label="¿Con cuánto le pagan? (para calcular el cambio)" value={recibido} onChange={setRecibido} size="xl" />
+                  {recibido > 0 &&
+                    (recibido >= total ? (
+                      <Card tone="success" padding="sm">
+                        <div className="text-center">
+                          <p className="text-lg text-success-800">Debe devolver</p>
+                          <p className="text-3xl font-bold text-success-800 tabular-nums">{cop(recibido - total)}</p>
+                        </div>
+                      </Card>
+                    ) : (
+                      <Alert tone="danger">Faltan {cop(total - recibido)}</Alert>
+                    ))}
+                </div>
+              )}
+
+              <div className="p-5 sm:p-6">
+                {!verCliente ? (
+                  <Button variant="link" icon={UserPlus} className="text-lg" onClick={() => setVerCliente(true)}>
+                    Poner el nombre del cliente en la factura (si quiere)
+                  </Button>
+                ) : (
+                  <FormGrid>
+                    <Input label="Nombre del cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} autoFocus />
+                    <Input label="Cédula" inputMode="numeric" value={documento} onChange={(e) => setDocumento(e.target.value)} />
+                    <p className="text-sm text-neutral-500 sm:col-span-2">
+                      El nombre y la cédula solo se usan para la factura de esta venta (Ley 1581 de 2012). Pregúntele al cliente si está de acuerdo.
+                    </p>
+                  </FormGrid>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <ActionBar>
+            <Button size="lg" block icon={Check} className="text-xl" disabled={!metodo} loading={pendiente} loadingText="Guardando la venta..." onClick={confirmar}>
+              {metodo ? `Confirmar la venta · ${cop(total)}` : "Primero toque la forma de pago"}
+            </Button>
+          </ActionBar>
         </div>
       )}
     </div>

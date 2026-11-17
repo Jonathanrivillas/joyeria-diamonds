@@ -1,9 +1,8 @@
+import { History, Palette, Plus, Save, UserPlus } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { PageHeader, EstadoBadge } from "@/components/ui";
+import { Button, Card, CardHeader, Checkbox, Input, PageContainer, PageHeader, PasswordInput, Section, Select, StatusBadge, Table, Td, Th, Tr } from "@/components/ui";
 import { alternarUsuario, crearUsuario, guardarCategoria, guardarLocal } from "./actions";
-import Link from "next/link";
-import { History } from "lucide-react";
 
 export default async function AdminPage() {
   const s = await requireAdmin();
@@ -14,116 +13,151 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="space-y-8">
-      <PageHeader titulo="Administración" subtitulo="Categorías y precios, locales y usuarios">
-        <Link href="/admin/auditoria" className="btn-secondary">
-          <History className="h-5 w-5" /> Historial de cambios
-        </Link>
-      </PageHeader>
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Categorías y precios sugeridos</h2>
-        <div className="card overflow-x-auto">
-          <table className="tabla">
+    <PageContainer className="space-y-8">
+      <PageHeader
+        title="Administración"
+        subtitle="Categorías y precios, locales y usuarios"
+        actions={
+          <>
+            <Button variant="secondary" href="/admin/componentes" icon={Palette}>
+              Sistema de diseño
+            </Button>
+            <Button variant="secondary" href="/admin/auditoria" icon={History}>
+              Historial de cambios
+            </Button>
+          </>
+        }
+      />
+
+      <Section title="Categorías y precios sugeridos">
+        <Card>
+          <Table>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Controla peso</th>
-                <th>Precio por gramo</th>
-                <th>Precio por unidad</th>
-                <th>Activa</th>
-                <th></th>
+                <Th colSpan={6} className="!p-0">
+                  <div className="grid min-w-[52rem] grid-cols-[1.5fr_0.8fr_1fr_1fr_0.5fr_8rem] gap-3 px-4 py-3">
+                    <span>Nombre</span>
+                    <span>Controla peso</span>
+                    <span>Precio por gramo</span>
+                    <span>Precio por unidad</span>
+                    <span>Activa</span>
+                    <span />
+                  </div>
+                </Th>
               </tr>
             </thead>
             <tbody>
               {[...categorias, null].map((c) => (
                 <tr key={c?.id ?? "nueva"}>
-                  <td colSpan={6} className="!p-0">
-                    <form action={guardarCategoria} className="grid grid-cols-[1.5fr_0.8fr_1fr_1fr_0.5fr_auto] items-center gap-3 px-3 py-2">
+                  <Td colSpan={6} className="!p-0">
+                    <form action={guardarCategoria} className="grid min-w-[52rem] grid-cols-[1.5fr_0.8fr_1fr_1fr_0.5fr_8rem] items-center gap-3 px-4 py-2">
                       <input type="hidden" name="id" value={c?.id ?? ""} />
-                      <input name="nombre" className="input py-1" defaultValue={c?.nombre ?? ""} placeholder="Nueva categoría..." />
-                      <input name="controlaPeso" type="checkbox" defaultChecked={c?.controlaPeso ?? true} className="h-4 w-4" />
-                      <input name="precioGramo" className="input py-1 text-right" defaultValue={c?.precioGramoSugerido ?? ""} placeholder="COP / g" />
-                      <input name="precioUnidad" className="input py-1 text-right" defaultValue={c?.precioUnidadSugerido ?? ""} placeholder="COP / und" />
-                      <input name="activa" type="checkbox" defaultChecked={c?.activa ?? true} className="h-4 w-4" />
-                      <button className={c ? "btn-secondary py-1" : "btn-primary py-1"}>{c ? "Guardar" : "Agregar"}</button>
+                      <Input label="Nombre" hideLabel name="nombre" defaultValue={c?.nombre ?? ""} placeholder="Nueva categoría..." />
+                      <Checkbox label="Controla peso" hideLabel name="controlaPeso" defaultChecked={c?.controlaPeso ?? true} />
+                      <Input label="Precio por gramo" hideLabel name="precioGramo" numeric defaultValue={c?.precioGramoSugerido ?? ""} placeholder="COP / g" />
+                      <Input label="Precio por unidad" hideLabel name="precioUnidad" numeric defaultValue={c?.precioUnidadSugerido ?? ""} placeholder="COP / und" />
+                      <Checkbox label="Activa" hideLabel name="activa" defaultChecked={c?.activa ?? true} />
+                      <Button type="submit" variant={c ? "secondary" : "primary"} icon={c ? Save : Plus}>
+                        {c ? "Guardar" : "Agregar"}
+                      </Button>
                     </form>
-                  </td>
+                  </Td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Table>
+        </Card>
+      </Section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Locales</h2>
-        <div className="card divide-y divide-stone-100">
-          {[...locales, null].map((l) => (
-            <form key={l?.id ?? "nuevo"} action={guardarLocal} className="grid grid-cols-[1fr_1.5fr_100px_auto] items-center gap-3 px-4 py-3">
-              <input type="hidden" name="id" value={l?.id ?? ""} />
-              <input name="nombre" className="input py-1" defaultValue={l?.nombre ?? ""} placeholder="Nombre del nuevo local" />
-              <input name="direccion" className="input py-1" defaultValue={l?.direccion ?? ""} placeholder="Dirección" />
-              <input name="prefijo" className="input py-1" defaultValue={l?.prefijoFactura ?? ""} placeholder="Prefijo" disabled={!!l} title="Prefijo de factura" />
-              <button className={l ? "btn-secondary py-1" : "btn-primary py-1"}>{l ? "Guardar" : "Agregar"}</button>
-            </form>
-          ))}
-        </div>
-      </section>
+      <Section title="Locales">
+        <Card>
+          <div className="divide-y divide-neutral-100 overflow-x-auto">
+            {[...locales, null].map((l) => (
+              <form key={l?.id ?? "nuevo"} action={guardarLocal} className="grid min-w-[40rem] grid-cols-[1fr_1.5fr_8rem_8rem] items-center gap-3 px-4 py-3">
+                <input type="hidden" name="id" value={l?.id ?? ""} />
+                <Input label="Nombre del local" hideLabel name="nombre" defaultValue={l?.nombre ?? ""} placeholder="Nombre del nuevo local" />
+                <Input label="Dirección" hideLabel name="direccion" defaultValue={l?.direccion ?? ""} placeholder="Dirección" />
+                <Input
+                  label="Prefijo de factura"
+                  hideLabel
+                  name="prefijo"
+                  defaultValue={l?.prefijoFactura ?? ""}
+                  placeholder="Prefijo"
+                  disabled={!!l}
+                  title="Prefijo de factura"
+                />
+                <Button type="submit" variant={l ? "secondary" : "primary"} icon={l ? Save : Plus}>
+                  {l ? "Guardar" : "Agregar"}
+                </Button>
+              </form>
+            ))}
+          </div>
+        </Card>
+      </Section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Usuarios</h2>
+      <Section title="Usuarios">
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="card overflow-x-auto">
-            <table className="tabla">
+          <Card>
+            <Table>
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Correo</th>
-                  <th>Rol</th>
-                  <th>Local</th>
-                  <th>Estado</th>
-                  <th></th>
+                  <Th>Nombre</Th>
+                  <Th>Correo</Th>
+                  <Th>Rol</Th>
+                  <Th>Local</Th>
+                  <Th>Estado</Th>
+                  <Th />
                 </tr>
               </thead>
               <tbody>
                 {usuarios.map((u) => (
-                  <tr key={u.id}>
-                    <td className="font-medium">{u.nombre}</td>
-                    <td className="font-mono text-xs">{u.email}</td>
-                    <td>{u.rol === "ADMIN" ? "Administrador" : "Vendedor"}</td>
-                    <td>{u.local?.nombre ?? "Todos"}</td>
-                    <td><EstadoBadge estado={u.activo ? "ACTIVA" : "ANULADA"} /></td>
-                    <td>
+                  <Tr key={u.id}>
+                    <Td className="font-medium">{u.nombre}</Td>
+                    <Td className="font-mono text-sm">{u.email}</Td>
+                    <Td>{u.rol === "ADMIN" ? "Administrador" : "Vendedor"}</Td>
+                    <Td>{u.local?.nombre ?? "Todos"}</Td>
+                    <Td>
+                      <StatusBadge status={u.activo ? "HABILITADO" : "INACTIVO"} />
+                    </Td>
+                    <Td>
                       {u.id !== s.id && (
                         <form action={alternarUsuario}>
                           <input type="hidden" name="id" value={u.id} />
-                          <button className="text-xs text-oro-700 hover:underline">{u.activo ? "Desactivar" : "Activar"}</button>
+                          <Button type="submit" size="sm" variant={u.activo ? "danger-outline" : "secondary"}>
+                            {u.activo ? "Desactivar" : "Activar"}
+                          </Button>
                         </form>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-          <form action={crearUsuario} className="card space-y-3 p-5">
-            <p className="text-sm font-semibold">Crear usuario</p>
-            <input name="nombre" className="input" placeholder="Nombre" required />
-            <input name="email" type="email" className="input" placeholder="correo@joyeria.com" required />
-            <input name="password" type="password" className="input" placeholder="Contraseña temporal (mín. 8)" minLength={8} required />
-            <div className="grid grid-cols-2 gap-3">
-              <select name="rol" className="input">
-                <option value="VENDEDOR">Vendedor</option>
-                <option value="ADMIN">Administrador</option>
-              </select>
-              <select name="localId" className="input">
-                {locales.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
-              </select>
-            </div>
-            <button className="btn-primary w-full">Crear</button>
-          </form>
+            </Table>
+          </Card>
+          <Card>
+            <CardHeader title="Crear usuario" icon={UserPlus} />
+            <form action={crearUsuario} className="space-y-4 p-5">
+              <Input label="Nombre" name="nombre" required />
+              <Input label="Correo" name="email" type="email" placeholder="correo@joyeria.com" required />
+              <PasswordInput label="Contraseña temporal" name="password" minLength={8} required hint="Mínimo 8 caracteres. Se le pedirá cambiarla al entrar." />
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  label="Rol"
+                  name="rol"
+                  options={[
+                    { value: "VENDEDOR", label: "Vendedor" },
+                    { value: "ADMIN", label: "Administrador" },
+                  ]}
+                />
+                <Select label="Local" name="localId" options={locales.map((l) => ({ value: l.id, label: l.nombre }))} />
+              </div>
+              <Button type="submit" block icon={UserPlus}>
+                Crear
+              </Button>
+            </form>
+          </Card>
         </div>
-      </section>
-    </div>
+      </Section>
+    </PageContainer>
   );
 }
