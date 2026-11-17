@@ -15,7 +15,7 @@ export { PrintButton } from "./print-button";
 
 // Íconos
 export { Icon, IconBadge, iconSizes, type IconSize } from "./icon";
-export { Logo } from "./logo";
+export { Logo, LogoNombre } from "./logo";
 
 // Estructura
 export { PageHeader, PageContainer, Section, BackLink } from "./page-header";
