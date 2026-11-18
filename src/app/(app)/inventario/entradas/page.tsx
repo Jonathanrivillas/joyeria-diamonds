@@ -25,7 +25,7 @@ export default async function EntradasPage() {
         back={{ href: "/inventario", label: "Volver al inventario" }}
         help="Use esto cuando llegan piezas nuevas al local. Se suman al inventario."
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
         <EntradaForm
           locales={locales.map((l) => ({ id: l.id, nombre: l.nombre }))}
           localDefecto={localId ?? locales[0]?.id}
@@ -39,23 +39,24 @@ export default async function EntradasPage() {
             <Table>
               <thead>
                 <tr>
-                  <Th>Fecha</Th>
-                  <Th>Local</Th>
-                  <Th>Categoría</Th>
-                  <Th numeric>Peso</Th>
-                  <Th numeric>Cant.</Th>
-                  <Th>Nota</Th>
+                  <Th>Qué llegó</Th>
+                  <Th numeric>Cuánto</Th>
                 </tr>
               </thead>
               <tbody>
                 {recientes.map((m) => (
                   <Tr key={m.id}>
-                    <Td className="whitespace-nowrap">{fechaHora(m.fecha)}</Td>
-                    <Td>{m.local.nombre}</Td>
-                    <Td>{m.categoria.nombre}</Td>
-                    <Td numeric>{gramos(m.pesoCg)}</Td>
-                    <Td numeric>{m.cantidad}</Td>
-                    <Td className="text-sm text-neutral-500">{m.nota}</Td>
+                    <Td>
+                      <span className="block font-medium">{m.categoria.nombre}</span>
+                      <span className="block text-sm text-neutral-500">
+                        {m.local.nombre} · {fechaHora(m.fecha)}
+                        {m.nota && ` · ${m.nota}`}
+                      </span>
+                    </Td>
+                    <Td numeric className="whitespace-nowrap">
+                      <span className="block font-semibold">{gramos(m.pesoCg)}</span>
+                      <span className="block text-sm text-neutral-500">{m.cantidad} pzs</span>
+                    </Td>
                   </Tr>
                 ))}
               </tbody>

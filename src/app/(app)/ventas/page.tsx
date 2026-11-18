@@ -121,7 +121,7 @@ export default async function VentasPage({
       />
 
       <form action="/ventas" className="no-print space-y-3">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div className="flex flex-wrap items-end gap-3">
             <Input
               label="Buscar una factura"

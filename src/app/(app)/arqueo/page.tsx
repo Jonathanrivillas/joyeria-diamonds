@@ -58,7 +58,7 @@ export default async function ArqueoPage({ searchParams }: { searchParams: Promi
         help="El arqueo es contar la mercancía y compararla con lo que dice el sistema, como en la planilla de papel. Se hace una vez al día."
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,32rem)_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
         <ArqueoHoyResumen
           locales={estadoHoy}
           accion={(l) =>

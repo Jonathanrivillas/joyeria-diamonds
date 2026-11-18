@@ -114,21 +114,23 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
           <Table>
             <thead>
               <tr>
-                <Th>Cuándo</Th>
-                <Th>Quién</Th>
+                <Th>Cuándo y quién</Th>
                 <Th>Qué hizo</Th>
-                <Th>Detalle</Th>
-                <Th className="hidden md:table-cell">Conexión</Th>
+                <Th className="hidden xl:table-cell">Conexión</Th>
               </tr>
             </thead>
             <tbody>
               {registros.map((r) => (
                 <Tr key={r.id}>
-                  <Td className="whitespace-nowrap">{fechaHora(r.fecha)}</Td>
-                  <Td>{r.usuarioNombre ?? "—"}</Td>
-                  <Td className="font-semibold">{ACCIONES[r.accion] ?? r.accion}</Td>
-                  <Td className="text-neutral-600">{resumen(r.accion, r.detalle as unknown as D | null)}</Td>
-                  <Td className="hidden text-sm text-neutral-500 md:table-cell">{r.ip}</Td>
+                  <Td>
+                    <span className="block sm:whitespace-nowrap">{fechaHora(r.fecha)}</span>
+                    <span className="block text-sm text-neutral-500">{r.usuarioNombre ?? "—"}</span>
+                  </Td>
+                  <Td>
+                    <span className="block font-semibold">{ACCIONES[r.accion] ?? r.accion}</span>
+                    <span className="block text-neutral-600">{resumen(r.accion, r.detalle as unknown as D | null)}</span>
+                  </Td>
+                  <Td className="hidden text-sm text-neutral-500 xl:table-cell">{r.ip}</Td>
                 </Tr>
               ))}
             </tbody>

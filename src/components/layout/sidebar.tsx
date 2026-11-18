@@ -20,7 +20,10 @@ function Enlace({ m, activo }: { m: Modulo; activo: boolean }) {
       <Icon icon={m.icon} />
       <span>
         <span className="block text-base font-semibold leading-tight">{m.label}</span>
-        <span className={cn("block text-sm leading-tight", activo ? "text-neutral-600" : "text-neutral-400")}>{m.detalle}</span>
+        {/* En pantallas bajas (laptop con zoom) se oculta la descripción para que el menú quepa sin desplazarse. */}
+        <span className={cn("block text-sm leading-tight [@media(max-height:760px)]:hidden", activo ? "text-neutral-600" : "text-neutral-400")}>
+          {m.detalle}
+        </span>
       </span>
     </Link>
   );
@@ -28,7 +31,7 @@ function Enlace({ m, activo }: { m: Modulo; activo: boolean }) {
 
 export function Marca() {
   return (
-    <div className="flex items-center gap-3 px-5 py-6">
+    <div className="flex items-center gap-3 px-5 py-6 [@media(max-height:760px)]:py-4">
       <Logo size="md" priority />
       <div className="min-w-0 flex-1">
         <LogoNombre priority />
@@ -46,11 +49,11 @@ export function Sidebar({ rol }: { rol: string }) {
   const contenido = (
     <>
       <Marca />
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="Menú principal">
+      <nav className="sin-barra flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="Menú principal">
         {PRINCIPALES.map((m) => (
           <Enlace key={m.href} m={m} activo={esActivo(path, m.href)} />
         ))}
-        <p className="px-3 pb-1 pt-5 text-sm font-semibold uppercase tracking-wide text-neutral-500">Más opciones</p>
+        <p className="px-3 pb-1 pt-5 text-sm font-semibold uppercase tracking-wide text-neutral-500 [@media(max-height:760px)]:pt-3">Más opciones</p>
         {otros.map((m) => (
           <Enlace key={m.href} m={m} activo={esActivo(path, m.href)} />
         ))}

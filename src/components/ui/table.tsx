@@ -46,7 +46,7 @@ export function Th({
   return (
     <th
       className={cn(
-        "border-b border-neutral-300 bg-neutral-50 px-4 py-3 text-left text-base font-semibold text-neutral-700",
+        "border-b border-neutral-300 bg-neutral-50 px-3 py-3 sm:px-4 text-left text-base font-semibold text-neutral-700",
         cellOptions({ numeric, center, divider, sticky }),
         className
       )}
@@ -69,7 +69,7 @@ export function Td({
   return (
     <td
       className={cn(
-        "border-b border-neutral-300 px-4 py-3",
+        "border-b border-neutral-300 px-3 py-3 sm:px-4",
         sticky && "bg-white group-hover:bg-neutral-50",
         cellOptions({ numeric, center, divider, sticky }),
         className

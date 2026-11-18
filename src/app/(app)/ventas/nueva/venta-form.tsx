@@ -320,7 +320,7 @@ export function VentaForm({
                 </p>
               </div>
 
-              <div className="grid gap-6 p-5 sm:p-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 p-5 sm:p-6 md:grid-cols-2">
                 {cat.controlaPeso && (
                   <GramsInput
                     label="¿Cuánto pesa? (póngala en la balanza)"
@@ -458,7 +458,7 @@ export function VentaForm({
 
               <div className="space-y-3 p-5 sm:p-6">
                 <h2 className="text-xl font-bold text-neutral-800">¿Cómo le pagan?</h2>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {METODOS.map((m) => (
                     <ChoiceTile key={m.id} selected={metodo === m.id} onClick={() => setMetodo(m.id)} icon={m.icon} title={m.nombre} className="p-5 text-xl" />
                   ))}

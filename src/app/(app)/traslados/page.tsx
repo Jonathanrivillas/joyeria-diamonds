@@ -23,7 +23,7 @@ export default async function TrasladosPage() {
         title="Traslados"
         help="Use esto para llevar piezas de un local al otro. Se descuentan del local que las envía y se suman al que las recibe."
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
         <TrasladoForm
           locales={locales.map((l) => ({ id: l.id, nombre: l.nombre }))}
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre, controlaPeso: c.controlaPeso }))}
@@ -36,28 +36,27 @@ export default async function TrasladosPage() {
             <Table>
               <thead>
                 <tr>
-                  <Th>Fecha</Th>
-                  <Th>Origen → Destino</Th>
-                  <Th>Categoría</Th>
-                  <Th numeric>Peso</Th>
-                  <Th numeric>Cant.</Th>
-                  <Th>Usuario</Th>
-                  <Th>Nota</Th>
+                  <Th>Qué se movió</Th>
+                  <Th numeric>Cuánto</Th>
                 </tr>
               </thead>
               <tbody>
                 {traslados.flatMap((t) =>
                   t.items.map((i) => (
                     <Tr key={i.id}>
-                      <Td className="whitespace-nowrap">{fechaHora(t.fecha)}</Td>
                       <Td>
-                        {t.origen.nombre} → {t.destino.nombre}
+                        <span className="block font-medium">
+                          {i.categoria.nombre}: {t.origen.nombre} → {t.destino.nombre}
+                        </span>
+                        <span className="block text-sm text-neutral-500">
+                          {fechaHora(t.fecha)} · {t.usuario.nombre}
+                          {t.nota && ` · ${t.nota}`}
+                        </span>
                       </Td>
-                      <Td>{i.categoria.nombre}</Td>
-                      <Td numeric>{gramos(i.pesoCg)}</Td>
-                      <Td numeric>{i.cantidad}</Td>
-                      <Td>{t.usuario.nombre}</Td>
-                      <Td className="text-sm text-neutral-500">{t.nota}</Td>
+                      <Td numeric className="whitespace-nowrap">
+                        <span className="block font-semibold">{gramos(i.pesoCg)}</span>
+                        <span className="block text-sm text-neutral-500">{i.cantidad} pzs</span>
+                      </Td>
                     </Tr>
                   ))
                 )}

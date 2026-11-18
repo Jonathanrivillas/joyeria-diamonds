@@ -101,7 +101,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
 
       <RangoFechas ruta="/reportes" rangos={rangos} activo={activo} desde={aISO(desde)} hasta={aISO(hasta)} max={aISO(hoy)} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {porLocal.map(({ local, res, porMetodo, porTipo, arqueo, stock }) => {
           const difArqueo = arqueo ? arqueo.pesoContadoCg - arqueo.pesoSistemaCg : 0;
           return (
@@ -134,7 +134,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
         })}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader title="Ventas y gastos por día" description="Barra dorada = ventas · barra gris = gastos" />
           <CardBody>

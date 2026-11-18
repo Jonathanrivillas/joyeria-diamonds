@@ -56,37 +56,49 @@ export default async function KardexPage({ params }: { params: Promise<{ categor
           <EmptyState icon={History} title="Esta categoría todavía no tiene movimientos." />
         ) : (
           <Table>
+            {/* Pocas columnas, con la información relacionada junta, para que quepa sin desplazarse. */}
             <thead>
               <tr>
                 <Th>Cuándo</Th>
-                {!localId && <Th>Local</Th>}
                 <Th>Qué pasó</Th>
-                <Th>Factura / ref.</Th>
-                <Th numeric>Gramos</Th>
-                <Th numeric>Piezas</Th>
-                <Th numeric>Quedó (g)</Th>
-                <Th numeric>Quedó (pzs)</Th>
-                <Th>Quién</Th>
-                <Th>Nota</Th>
+                <Th numeric>Entró / salió</Th>
+                <Th numeric className="hidden sm:table-cell">Quedó</Th>
               </tr>
             </thead>
             <tbody>
               {filas.map((m) => (
                 <Tr key={m.id}>
-                  <Td className="whitespace-nowrap">{fechaHora(m.fecha)}</Td>
-                  {!localId && <Td>{m.local.nombre}</Td>}
-                  <Td>{TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo}</Td>
-                  <Td className="font-mono text-sm">{m.referencia ?? ""}</Td>
-                  <Td numeric>
-                    <Cambio valor={m.pesoCg} texto={gramos(m.pesoCg, false)} />
+                  <Td>
+                    <span className="block sm:whitespace-nowrap">{fechaHora(m.fecha)}</span>
+                    <span className="block text-sm text-neutral-500">
+                      {m.usuario.nombre}
+                      {!localId && ` · ${m.local.nombre}`}
+                    </span>
                   </Td>
-                  <Td numeric>
-                    <Cambio valor={m.cantidad} texto={String(m.cantidad)} />
+                  <Td>
+                    <span className="block font-medium">{TIPOS_MOVIMIENTO[m.tipo] ?? m.tipo}</span>
+                    {(m.referencia || m.nota) && (
+                      <span className="block text-sm text-neutral-500">
+                        {m.referencia && <span className="font-mono">{m.referencia}</span>}
+                        {m.referencia && m.nota && " · "}
+                        {m.nota}
+                      </span>
+                    )}
                   </Td>
-                  <Td numeric className="font-medium">{gramos(m.saldoPeso, false)}</Td>
-                  <Td numeric className="font-medium">{m.saldoCant}</Td>
-                  <Td>{m.usuario.nombre}</Td>
-                  <Td className="text-sm text-neutral-500">{m.nota ?? ""}</Td>
+                  <Td numeric className="whitespace-nowrap">
+                    <span className="block">
+                      <Cambio valor={m.pesoCg} texto={gramos(m.pesoCg)} />
+                    </span>
+                    <span className="block text-sm">
+                      <Cambio valor={m.cantidad} texto={`${m.cantidad} pzs`} />
+                    </span>
+                    {/* En celular, el saldo va aquí en vez de en su propia columna. */}
+                    <span className="mt-1 block text-sm text-neutral-500 sm:hidden">Quedó {gramos(m.saldoPeso)}</span>
+                  </Td>
+                  <Td numeric className="hidden whitespace-nowrap sm:table-cell">
+                    <span className="block font-semibold">{gramos(m.saldoPeso)}</span>
+                    <span className="block text-sm text-neutral-500">{entero(m.saldoCant)} pzs</span>
+                  </Td>
                 </Tr>
               ))}
             </tbody>

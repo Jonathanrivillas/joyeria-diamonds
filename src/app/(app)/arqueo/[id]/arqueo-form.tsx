@@ -196,7 +196,7 @@ export function ArqueoForm({
         leaveLabel="Sí, salir sin guardar"
       />
 
-      <div className="grid gap-4 xl:grid-cols-2 min-[1800px]:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 min-[1800px]:grid-cols-3">
         {detalles.map((d, i) => {
           const f = filas[i];
           const x = calc[i];
@@ -245,7 +245,7 @@ export function ArqueoForm({
               </div>
 
               {f.modo === "diferente" && (
-                <div className="grid gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2">
                   {d.controlaPeso && <GramsInput label="¿Cuánto pesó lo que contó?" value={f.peso} onChange={(v) => set(i, { peso: v })} autoFocus />}
                   <CountInput label="¿Cuántas piezas contó?" value={f.cant} onChange={(v) => set(i, { cant: v })} />
                   <Input

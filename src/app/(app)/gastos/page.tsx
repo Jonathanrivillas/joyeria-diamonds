@@ -53,7 +53,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
     <PageContainer width="fluid">
       <PageHeader title="Gastos" help="Anote aquí todo lo que se paga con la plata del local, con la explicación de en qué se gastó." />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,34rem)_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
         <GastoForm esAdmin={s.rol === "ADMIN"} locales={locales} localDefecto={localId ?? locales[0]?.id} />
 
         <Section title="Gastos anotados">

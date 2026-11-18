@@ -13,10 +13,6 @@ import {
   Section,
   Select,
   StatusBadge,
-  Table,
-  Td,
-  Th,
-  Tr,
 } from "@/components/ui";
 import {
   alternarUsuario,
@@ -57,12 +53,12 @@ export default async function AdminPage() {
             description="Todo se vende por gramos al precio del día que la administradora pone en el inicio. Aquí solo se cambia el nombre o se deja de vender un tipo de pieza."
           >
             <Card>
-              <div className="divide-y divide-neutral-100 overflow-x-auto">
+              <div className="divide-y divide-neutral-100">
                 {[...categorias, null].map((c) => (
                   <form
                     key={c?.id ?? "nueva"}
                     action={guardarCategoria}
-                    className="grid min-w-[32rem] grid-cols-[1fr_11rem_8rem] items-center gap-3 px-4 py-2"
+                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
                   >
                     <input type="hidden" name="id" value={c?.id ?? ""} />
                     <Input
@@ -96,12 +92,12 @@ export default async function AdminPage() {
 
           <Section title="Locales (solo soporte)">
             <Card>
-              <div className="divide-y divide-neutral-100 overflow-x-auto">
+              <div className="divide-y divide-neutral-100">
                 {[...locales, null].map((l) => (
                   <form
                     key={l?.id ?? "nuevo"}
                     action={guardarLocal}
-                    className="grid min-w-[40rem] grid-cols-[1fr_1.5fr_8rem_8rem] items-center gap-3 px-4 py-3"
+                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_7rem_auto]"
                   >
                     <input type="hidden" name="id" value={l?.id ?? ""} />
                     <Input
@@ -143,49 +139,41 @@ export default async function AdminPage() {
       )}
 
       <Section title="Usuarios">
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* Lista (no tabla) para que se acomode a cualquier ancho sin desplazarse de lado. */}
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Nombre</Th>
-                  <Th>Correo</Th>
-                  <Th>Rol</Th>
-                  <Th>Local</Th>
-                  <Th>Estado</Th>
-                  <Th />
-                </tr>
-              </thead>
-              <tbody>
-                {usuarios.map((u) => (
-                  <Tr key={u.id}>
-                    <Td className="font-medium">{u.nombre}</Td>
-                    <Td className="font-mono text-sm">{u.email}</Td>
-                    <Td>{u.rol === "ADMIN" ? "Administrador" : "Vendedor"}</Td>
-                    <Td>{u.local?.nombre ?? "Todos"}</Td>
-                    <Td>
-                      <StatusBadge
-                        status={u.activo ? "HABILITADO" : "INACTIVO"}
-                      />
-                    </Td>
-                    <Td>
-                      {u.id !== s.id && (
-                        <form action={alternarUsuario}>
-                          <input type="hidden" name="id" value={u.id} />
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant={u.activo ? "danger-outline" : "secondary"}
-                          >
-                            {u.activo ? "Desactivar" : "Activar"}
-                          </Button>
-                        </form>
-                      )}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+            <ul className="divide-y divide-neutral-100">
+              {usuarios.map((u) => (
+                <li
+                  key={u.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4"
+                >
+                  <div className="min-w-0 flex-1 basis-56">
+                    <p className="text-lg font-semibold">{u.nombre}</p>
+                    <p className="break-all text-sm text-neutral-500">
+                      {u.email}
+                    </p>
+                    <p className="text-base text-neutral-700">
+                      {u.rol === "ADMIN" ? "Administrador" : "Vendedor"} ·{" "}
+                      {u.local?.nombre ?? "Todos los locales"}
+                    </p>
+                  </div>
+                  <StatusBadge status={u.activo ? "HABILITADO" : "INACTIVO"} />
+                  {u.id !== s.id && (
+                    <form action={alternarUsuario}>
+                      <input type="hidden" name="id" value={u.id} />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant={u.activo ? "danger-outline" : "secondary"}
+                      >
+                        {u.activo ? "Desactivar" : "Activar"}
+                      </Button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
           </Card>
           <Card>
             <CardHeader title="Crear usuario" icon={UserPlus} />
@@ -205,7 +193,7 @@ export default async function AdminPage() {
                 required
                 hint="Mínimo 8 caracteres. Se le pedirá cambiarla al entrar."
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <Select
                   label="Rol"
                   name="rol"

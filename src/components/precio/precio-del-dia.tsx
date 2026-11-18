@@ -57,7 +57,7 @@ export function PrecioDelDia({
             </p>
           </div>
           {estado?.error && <Alert tone="danger">{estado.error}</Alert>}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <form action={accion}>
               <input type="hidden" name="valor" value={valor} />
               <Button

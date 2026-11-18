@@ -96,7 +96,7 @@ export default async function InicioPage() {
       </Section>
 
       <Section title="Accesos rápidos">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Acceso href={MODULOS.gastos.href} titulo="Anotar un gasto" texto="En qué se gastó plata" icon={MODULOS.gastos.icon} />
           <Acceso href={MODULOS.arqueo.href} titulo="Hacer el arqueo" texto="Contar la mercancía" icon={MODULOS.arqueo.icon} />
           <Acceso

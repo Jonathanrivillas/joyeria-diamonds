@@ -65,7 +65,7 @@ export default async function VentaDetallePage({
               </div>
             </Card>
           )}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <PrintButton label="Imprimir factura" size="lg" variant="primary" />
             <Button href="/ventas/nueva" size="lg" variant="secondary" icon={ShoppingBag}>
               Hacer otra venta
@@ -95,7 +95,7 @@ export default async function VentaDetallePage({
           </div>
         </div>
 
-        <div className="grid gap-4 py-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-3">
           <LabeledValue label="Cliente">
             <p>{v.clienteNombre ?? "Consumidor final"}</p>
             {v.clienteDocumento && <p className="text-neutral-500">C.C. {v.clienteDocumento}</p>}
@@ -110,7 +110,7 @@ export default async function VentaDetallePage({
               <Th>Pieza</Th>
               <Th numeric>Peso</Th>
               <Th numeric>Cant.</Th>
-              <Th numeric>Precio</Th>
+              <Th numeric className="hidden sm:table-cell">Precio</Th>
               <Th numeric>Valor</Th>
             </tr>
           </thead>
@@ -121,10 +121,15 @@ export default async function VentaDetallePage({
                   <span className="font-semibold">{i.categoria.nombre}</span>
                   {i.descripcion && <span className="block text-sm text-neutral-500">{i.descripcion}</span>}
                   {i.hechura > 0 && <span className="block text-sm text-neutral-500">Incluye hechura {cop(i.hechura)}</span>}
+                  {/* En celular el precio va aquí y no en su propia columna, para que la tabla quepa. */}
+                  <span className="block text-sm text-neutral-500 sm:hidden">
+                    {cop(i.precioGramo)}
+                    {i.categoria.controlaPeso ? " el gramo" : " c/u"}
+                  </span>
                 </Td>
                 <Td numeric>{i.categoria.controlaPeso ? gramos(i.pesoCg) : "—"}</Td>
                 <Td numeric>{i.cantidad}</Td>
-                <Td numeric>
+                <Td numeric className="hidden sm:table-cell">
                   {cop(i.precioGramo)}
                   {i.categoria.controlaPeso ? " /g" : ""}
                 </Td>
