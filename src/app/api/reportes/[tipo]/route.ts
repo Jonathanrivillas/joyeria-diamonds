@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSesion, getAlcance } from "@/lib/session";
 import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
+import { TIPOS_GASTO } from "@/lib/format";
 
 function csv(filas: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
@@ -92,7 +93,7 @@ export async function GET(
       ...gastos.map((x) => [
         x.fecha.toLocaleString("es-CO", { timeZone: ZONA_HORARIA }),
         x.local.nombre,
-        x.tipo,
+        TIPOS_GASTO[x.tipo] ?? x.tipo,
         x.justificacion,
         x.usuario.nombre,
         x.monto,

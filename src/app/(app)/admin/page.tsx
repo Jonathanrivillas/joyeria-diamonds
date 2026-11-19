@@ -25,7 +25,7 @@ export default async function AdminPage() {
   const s = await requireAdmin();
   const soporte = esSoporte(s);
   const [categorias, locales, usuarios] = await Promise.all([
-    db.categoria.findMany({ orderBy: { orden: "asc" } }),
+    db.categoria.findMany({ where: { esServicio: false }, orderBy: { orden: "asc" } }),
     db.local.findMany({ orderBy: { id: "asc" } }),
     db.usuario.findMany({ orderBy: { id: "asc" }, include: { local: true } }),
   ]);

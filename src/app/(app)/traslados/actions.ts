@@ -24,7 +24,7 @@ export async function crearTraslado(
   if (!origenId || !destinoId || origenId === destinoId)
     return { error: "El local que envía y el que recibe deben ser distintos." };
   const cat = await db.categoria.findUnique({ where: { id: categoriaId } });
-  if (!cat) return { error: "Ese tipo de pieza no existe." };
+  if (!cat || cat.esServicio) return { error: "Ese tipo de pieza no existe." };
   if (Number.isNaN(pesoCg) || (cat.controlaPeso && pesoCg <= 0))
     return { error: "Escriba cuánto pesa lo que va a mover." };
   if (!Number.isInteger(cantidad) || cantidad <= 0)

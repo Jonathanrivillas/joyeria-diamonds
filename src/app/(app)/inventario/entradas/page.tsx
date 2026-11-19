@@ -9,7 +9,7 @@ export default async function EntradasPage() {
   const s = await requireAdmin();
   const { localId, locales } = await getAlcance(s);
   const [categorias, recientes] = await Promise.all([
-    db.categoria.findMany({ where: { activa: true }, orderBy: { orden: "asc" } }),
+    db.categoria.findMany({ where: { activa: true, esServicio: false }, orderBy: { orden: "asc" } }),
     db.movimiento.findMany({
       where: { tipo: "ENTRADA", ...(localId ? { localId } : {}) },
       orderBy: { fecha: "desc" },

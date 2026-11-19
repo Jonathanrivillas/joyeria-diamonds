@@ -116,7 +116,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
                 )}
                 <DataRow label="Gastó" value={cop(res.totalGastos)} tone="danger" strong />
                 {porTipo.length > 0 && (
-                  <p className="-mt-2 text-base text-neutral-500">{porTipo.map((t) => `${TIPOS_GASTO[t.tipo]} ${cop(t._sum.monto ?? 0)}`).join(" · ")}</p>
+                  <p className="-mt-2 text-base text-neutral-500">{porTipo.map((t) => `${TIPOS_GASTO[t.tipo] ?? t.tipo} ${cop(t._sum.monto ?? 0)}`).join(" · ")}</p>
                 )}
                 <Card tone={res.neto >= 0 ? "success" : "danger"} padding="sm">
                   <DataRow label="Le quedó" value={cop(res.neto)} tone={res.neto >= 0 ? "success" : "danger"} strong size="xl" className="font-normal" />

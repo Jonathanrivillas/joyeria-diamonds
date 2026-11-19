@@ -32,7 +32,7 @@ export async function iniciarArqueo(form: FormData) {
 
   const [categorias, existencias] = await Promise.all([
     db.categoria.findMany({
-      where: { activa: true },
+      where: { activa: true, esServicio: false },
       orderBy: { orden: "asc" },
     }),
     db.existencia.findMany({ where: { localId } }),

@@ -13,7 +13,6 @@ import {
   ActionBar,
   Card,
   CardFooter,
-  Checkbox,
   ChoiceGrid,
   ChoiceTile,
   Chip,
@@ -33,7 +32,8 @@ import {
   Stepper,
 } from "@/components/ui";
 
-type Cat = { id: number; nombre: string; controlaPeso: boolean; precio: number };
+/** esServicio: fabricación o reparación. Se cobra el valor que se escriba y no toca el inventario. */
+type Cat = { id: number; nombre: string; controlaPeso: boolean; esServicio: boolean; precio: number };
 type Ex = { localId: number; categoriaId: number; pesoCg: number; cantidad: number };
 type Item = {
   key: number;
@@ -42,7 +42,6 @@ type Item = {
   pesoCg: number;
   cantidad: number;
   precio: number;
-  hechura: number;
   subtotal: number;
 };
 type Paso = "elegir" | "pieza" | "resumen" | "cobrar";
@@ -58,8 +57,8 @@ let siguienteKey = 1;
 
 const piezas = (n: number) => `${n} ${n === 1 ? "pieza" : "piezas"}`;
 
-function calcular(c: Cat, pesoCg: number, cantidad: number, precio: number, hechura: number) {
-  return c.controlaPeso ? Math.round((pesoCg / 100) * precio) + hechura : precio * cantidad + hechura;
+function calcular(c: Cat, pesoCg: number, cantidad: number, precio: number) {
+  return c.controlaPeso ? Math.round((pesoCg / 100) * precio) : precio * cantidad;
 }
 
 export function VentaForm({
@@ -88,8 +87,6 @@ export function VentaForm({
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState(0);
   const [cambiarPrecio, setCambiarPrecio] = useState(false);
-  const [conHechura, setConHechura] = useState(false);
-  const [hechura, setHechura] = useState(0);
   const [descripcion, setDescripcion] = useState("");
 
   // Cobro
@@ -134,8 +131,6 @@ export function VentaForm({
     setCantidad(1);
     setPrecio(c.precio);
     setCambiarPrecio(false);
-    setConHechura(false);
-    setHechura(0);
     setDescripcion("");
     setPaso("pieza");
   }
@@ -144,13 +139,15 @@ export function VentaForm({
   const cat = catId ? catMap.get(catId) : undefined;
   const pesoCg = parseGramos(peso);
   const pesoValido = !cat?.controlaPeso || (!Number.isNaN(pesoCg) && pesoCg > 0);
-  const subtotal = cat ? calcular(cat, pesoValido && cat.controlaPeso ? pesoCg : 0, cantidad, precio, conHechura ? hechura : 0) : 0;
+  const subtotal = cat ? calcular(cat, pesoValido && cat.controlaPeso ? pesoCg : 0, cantidad, precio) : 0;
   const disp = cat ? disponible(cat.id) : { pesoCg: 0, cantidad: 0 };
   const excedePeso = !!cat?.controlaPeso && pesoValido && pesoCg > disp.pesoCg;
-  const excedeCant = cantidad > disp.cantidad;
+  const excedeCant = !cat?.esServicio && cantidad > disp.cantidad;
+  const servicioListo = precio > 0 && descripcion.trim().length > 0;
 
   function agregar() {
     if (!cat) return;
+    if (cat.esServicio && !servicioListo) return setError("Escriba cuánto cobra y qué trabajo es.");
     if (!pesoValido) return setError("Escriba cuántos gramos pesa la pieza.");
     if (excedePeso || excedeCant) return setError("No hay suficiente mercancía en el inventario para esta pieza.");
     if (precio <= 0) return setError("El precio no puede ser cero.");
@@ -159,11 +156,10 @@ export function VentaForm({
       {
         key: siguienteKey++,
         categoriaId: cat.id,
-        descripcion,
+        descripcion: descripcion.trim(),
         pesoCg: cat.controlaPeso ? pesoCg : 0,
         cantidad,
         precio,
-        hechura: conHechura ? hechura : 0,
         subtotal,
       },
     ]);
@@ -184,7 +180,7 @@ export function VentaForm({
           pesoCg: i.pesoCg,
           cantidad: i.cantidad,
           precioGramo: i.precio,
-          hechura: i.hechura,
+          hechura: 0,
         })),
       });
       if (r.error) setError(r.error);
@@ -194,6 +190,7 @@ export function VentaForm({
 
   const paso3 = paso === "cobrar" ? 3 : paso === "resumen" ? 2 : 1;
   const agotado = (c: Cat) => {
+    if (c.esServicio) return false;
     const d = disponible(c.id);
     return d.cantidad <= 0 || (c.controlaPeso && d.pesoCg <= 0);
   };
@@ -288,7 +285,7 @@ export function VentaForm({
                     disabled={agotado(c)}
                     onClick={() => elegir(c)}
                     title={c.nombre}
-                    description={agotado(c) ? "Agotado" : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
+                    description={c.esServicio ? "Trabajo" : agotado(c) ? "Agotado" : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
                   />
                 );
               })}
@@ -306,7 +303,42 @@ export function VentaForm({
       )}
 
       {/* PASO 1b: datos de la pieza */}
-      {paso === "pieza" && cat && (
+      {paso === "pieza" && cat?.esServicio && (
+        <div className="max-w-4xl">
+          <BackLink onClick={() => setPaso("elegir")}>Escoger otro tipo de pieza</BackLink>
+          <Card>
+            <div className="divide-y divide-neutral-200">
+              <div className="p-5 sm:p-6">
+                <p className="text-base text-neutral-500">Está cobrando un trabajo</p>
+                <h2 className="text-2xl font-bold">{cat.nombre}</h2>
+              </div>
+
+              <div className="space-y-5 p-5 sm:p-6">
+                <MoneyInput label="¿Cuánto cobra por el trabajo?" value={precio} onChange={setPrecio} autoFocus size="xl" />
+                <Input
+                  label="¿Qué trabajo es?"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder={cat.nombre.toLowerCase().startsWith("repar") ? "Ej: soldar cadena" : "Ej: anillo de grado en oro"}
+                  maxLength={120}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-end justify-between gap-4 rounded-b-2xl bg-neutral-50 p-5 sm:p-6">
+                <div>
+                  <p className="text-base text-neutral-600">Valor del trabajo</p>
+                  <p className="text-3xl font-bold tabular-nums">{cop(precio)}</p>
+                </div>
+                <Button size="lg" icon={Check} onClick={agregar} disabled={!servicioListo} className="w-full sm:w-auto">
+                  {precio <= 0 ? "Escriba cuánto cobra" : !descripcion.trim() ? "Escriba qué trabajo es" : "Agregar a la venta"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {paso === "pieza" && cat && !cat.esServicio && (
         <div className="max-w-4xl">
           <BackLink onClick={() => setPaso("elegir")}>Escoger otro tipo de pieza</BackLink>
           <Card>
@@ -362,10 +394,6 @@ export function VentaForm({
                     }
                   />
                 )}
-                <div className="space-y-3">
-                  <Checkbox variant="card" label="Cobrar hechura (mano de obra)" checked={conHechura} onChange={(e) => setConHechura(e.target.checked)} />
-                  {conHechura && <MoneyInput label="Valor de la hechura" value={hechura} onChange={setHechura} />}
-                </div>
                 <Input label="Nota sobre la pieza (si quiere)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: cadena lazo de 50 cm" />
               </div>
 
@@ -374,7 +402,6 @@ export function VentaForm({
                 <div>
                   <p className="text-base text-neutral-600">
                     Valor de esta pieza · {cat.controlaPeso ? (pesoValido && peso ? gramos(pesoCg) : "__ g") : cantidad} × {cop(precio)}
-                    {conHechura && hechura > 0 && <> + hechura {cop(hechura)}</>}
                   </p>
                   <p className="text-3xl font-bold tabular-nums">{cop(subtotal)}</p>
                 </div>
@@ -404,7 +431,7 @@ export function VentaForm({
                         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-800">{n + 1}</span>
                       }
                       title={c.nombre}
-                      meta={[c.controlaPeso && gramos(i.pesoCg), piezas(i.cantidad), i.hechura > 0 && `hechura ${cop(i.hechura)}`, i.descripcion]
+                      meta={[c.controlaPeso && gramos(i.pesoCg), !c.esServicio && piezas(i.cantidad), i.descripcion]
                         .filter(Boolean)
                         .join(" · ")}
                       end={

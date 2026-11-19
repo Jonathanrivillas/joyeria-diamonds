@@ -24,7 +24,7 @@ export async function planillaDelDia(localId: number | null, dia: Date): Promise
   const whereLocal = localId ? { localId } : {};
 
   const [categorias, existencias, delDia, posteriores] = await Promise.all([
-    db.categoria.findMany({ where: { activa: true }, orderBy: { orden: "asc" } }),
+    db.categoria.findMany({ where: { activa: true, esServicio: false }, orderBy: { orden: "asc" } }),
     db.existencia.groupBy({ by: ["categoriaId"], where: whereLocal, _sum: { pesoCg: true, cantidad: true } }),
     db.movimiento.findMany({
       where: { ...whereLocal, fecha: { gte: desde, lte: hasta } },

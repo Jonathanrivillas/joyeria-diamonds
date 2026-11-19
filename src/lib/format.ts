@@ -108,12 +108,15 @@ export function fechaHora(d: Date): string {
   return fmtFechaHora.format(d);
 }
 
+/** Tipos de gasto válidos. Los de "Presupuesto" llevan el grupo en el nombre. */
 export const TIPOS_GASTO: Record<string, string> = {
-  NOMINA: "Nómina",
-  ARRIENDO: "Arriendo",
-  SERVICIOS: "Servicios",
+  SALUD: "Presupuesto · Salud",
+  NOMINA: "Presupuesto · Nómina",
+  ARRIENDO: "Presupuesto · Arriendo",
+  PRESTACIONES: "Presupuesto · Prestaciones",
+  TALLERES: "Talleres",
+  COMISIONES: "Comisiones",
   INSUMOS: "Insumos",
-  OTROS: "Otros",
 };
 
 export const METODOS_PAGO: Record<string, string> = {

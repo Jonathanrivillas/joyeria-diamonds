@@ -21,6 +21,7 @@ export async function guardarCategoria(form: FormData) {
   if (!data.nombre || data.nombre.length > 60) return;
   if (id) {
     const antes = await db.categoria.findUnique({ where: { id } });
+    if (!antes || antes.esServicio) return; // Fabricación y reparación no se editan aquí
     await db.categoria.update({ where: { id }, data });
     await auditar(s, "CATEGORIA_EDITADA", {
       entidad: "Categoria",

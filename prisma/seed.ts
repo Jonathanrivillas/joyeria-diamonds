@@ -31,7 +31,7 @@ const CATEGORIAS: [string, boolean, number, number, number, number][] = [
   ["Topos-Esmeralda", true, 450000, 0, 2480, 22],
   ["Anillos-Esmeralda", true, 460000, 0, 4827, 15],
   ["Dijes-Esmeralda", true, 450000, 0, 3610, 18],
-  ["Neón", false, 0, 25000, 0, 35],
+  ["Neoro", false, 0, 25000, 0, 35],
   ["Anillos Italy", true, 420000, 0, 3220, 12],
   ["Diamantes", false, 0, 1800000, 0, 8],
 ];
@@ -42,12 +42,12 @@ const CLIENTES = [
 ];
 
 const GASTOS: [string, string, number, number][] = [
-  ["SERVICIOS", "Pago de energía del local", 180000, 320000],
+  ["ARRIENDO", "Pago de energía del local", 180000, 320000],
   ["INSUMOS", "Bolsas, estuches y cajas de regalo", 60000, 180000],
   ["INSUMOS", "Limpiador y paños para joyas", 25000, 70000],
-  ["OTROS", "Domicilio de mercancía", 15000, 40000],
-  ["OTROS", "Cafetería y aseo", 20000, 60000],
-  ["SERVICIOS", "Internet y datáfono", 90000, 150000],
+  ["INSUMOS", "Domicilio de mercancía", 15000, 40000],
+  ["INSUMOS", "Cafetería y aseo", 20000, 60000],
+  ["ARRIENDO", "Internet y datáfono", 90000, 150000],
 ];
 
 async function main() {

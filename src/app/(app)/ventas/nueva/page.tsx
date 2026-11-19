@@ -23,8 +23,9 @@ export default async function NuevaVentaPage() {
           id: c.id,
           nombre: c.nombre,
           controlaPeso: c.controlaPeso,
+          esServicio: c.esServicio,
           // Todo se vende por gramos al precio del día (configurado en el inicio).
-          precio: c.controlaPeso ? precio.valor : c.precioUnidadSugerido,
+          precio: c.esServicio ? 0 : c.controlaPeso ? precio.valor : c.precioUnidadSugerido,
         }))}
         existencias={existencias.map((e) => ({
           localId: e.localId,

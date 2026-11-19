@@ -23,7 +23,7 @@ export async function registrarEntrada(
   if (!localId || !categoriaId)
     return { error: "Escoja el local y el tipo de pieza." };
   const cat = await db.categoria.findUnique({ where: { id: categoriaId } });
-  if (!cat) return { error: "Ese tipo de pieza no existe." };
+  if (!cat || cat.esServicio) return { error: "Ese tipo de pieza no existe." };
   if (Number.isNaN(pesoCg) || pesoCg < 0)
     return {
       error: "El peso no se entiende. Escriba solo el número, ej: 5,20",

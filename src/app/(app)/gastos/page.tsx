@@ -21,7 +21,7 @@ import {
   StatPanel,
   cn,
 } from "@/components/ui";
-import { iconoGasto } from "@/components/gastos/tipos-gasto";
+import { GRUPOS_GASTO, iconoGasto } from "@/components/gastos/tipos-gasto";
 import { RangoFechas } from "@/components/filtros/rango-fechas";
 import { GastoForm } from "./gasto-form";
 import { anularGasto } from "./actions";
@@ -41,8 +41,15 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
   });
   const activos = gastos.filter((g) => g.estado === "ACTIVO");
   const total = activos.reduce((a, g) => a + g.monto, 0);
-  const porTipo = Object.keys(TIPOS_GASTO)
-    .map((t) => ({ tipo: t, total: activos.filter((g) => g.tipo === t).reduce((a, g) => a + g.monto, 0) }))
+  const sumar = (tipos: string[]) => activos.filter((g) => tipos.includes(g.tipo)).reduce((a, g) => a + g.monto, 0);
+  const porTipo = GRUPOS_GASTO.map((grupo) => ({
+    grupo,
+    total: sumar(grupo.subtipos ? grupo.subtipos.map((st) => st.id) : [grupo.id]),
+    detalle: (grupo.subtipos ?? [])
+      .map((st) => ({ id: st.id, nombre: st.nombre, total: sumar([st.id]) }))
+      .filter((st) => st.total > 0)
+      .sort((a, b) => b.total - a.total),
+  }))
     .filter((t) => t.total > 0)
     .sort((a, b) => b.total - a.total);
 
@@ -70,10 +77,22 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
                 <p className="text-base text-neutral-600">En qué se fue</p>
                 <ul className="mt-2 space-y-1.5">
                   {porTipo.map((t) => (
-                    <li key={t.tipo} className="flex items-center gap-2 text-base">
-                      <Icon icon={iconoGasto(t.tipo)} size="sm" className="text-neutral-500" />
-                      <span className="flex-1">{TIPOS_GASTO[t.tipo]}</span>
-                      <span className="font-semibold tabular-nums">{cop(t.total)}</span>
+                    <li key={t.grupo.id} className="text-base">
+                      <div className="flex items-center gap-2">
+                        <Icon icon={t.grupo.icon} size="sm" className="text-neutral-500" />
+                        <span className="flex-1">{t.grupo.nombre}</span>
+                        <span className="font-semibold tabular-nums">{cop(t.total)}</span>
+                      </div>
+                      {t.detalle.length > 0 && (
+                        <ul className="mt-1 space-y-1 pl-7 text-neutral-600">
+                          {t.detalle.map((st) => (
+                            <li key={st.id} className="flex items-center gap-2">
+                              <span className="flex-1">{st.nombre}</span>
+                              <span className="tabular-nums">{cop(st.total)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -94,7 +113,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
                       muted={anulado}
                       leading={<IconBadge icon={iconoGasto(g.tipo)} tone="neutral" size="sm" />}
                       title={<span className="whitespace-normal">{g.justificacion}</span>}
-                      meta={[TIPOS_GASTO[g.tipo], cuando(g.fecha), g.usuario.nombre, !localId && g.local.nombre].filter(Boolean).join(" · ")}
+                      meta={[TIPOS_GASTO[g.tipo] ?? g.tipo, cuando(g.fecha), g.usuario.nombre, !localId && g.local.nombre].filter(Boolean).join(" · ")}
                       end={
                         <div className="flex items-center gap-3">
                           <p className={cn("text-xl font-bold tabular-nums", anulado && "text-neutral-500 line-through")}>{cop(g.monto)}</p>

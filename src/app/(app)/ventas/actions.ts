@@ -49,9 +49,11 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
     const subtotal = c.controlaPeso
       ? Math.round((i.pesoCg / 100) * i.precioGramo) + i.hechura
       : i.precioGramo * i.cantidad + i.hechura;
-    return { ...i, pesoCg: c.controlaPeso ? i.pesoCg : 0, subtotal, controlaPeso: c.controlaPeso };
+    return { ...i, pesoCg: c.controlaPeso ? i.pesoCg : 0, subtotal, controlaPeso: c.controlaPeso, esServicio: c.esServicio };
   });
   if (items.some((i) => i.controlaPeso && i.pesoCg <= 0)) return { error: "Indica el peso de cada pieza" };
+  if (items.some((i) => i.esServicio && (i.subtotal <= 0 || !i.descripcion.trim())))
+    return { error: "Escriba el valor y qué trabajo es en cada fabricación o reparación." };
   const total = items.reduce((a, i) => a + i.subtotal, 0);
   if (total > 2_000_000_000) return { error: "El total es demasiado alto. Revise el peso y el precio." };
 
@@ -80,7 +82,8 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
           },
         },
       });
-      for (const i of items) {
+      // Fabricación y reparación son trabajos: no salen del inventario.
+      for (const i of items.filter((i) => !i.esServicio)) {
         await registrarMovimiento(tx, {
           localId,
           categoriaId: i.categoriaId,
@@ -108,7 +111,7 @@ export async function anularVenta(form: FormData) {
   if (!motivo) throw new Error("Indica el motivo de la anulación");
 
   await db.$transaction(async (tx) => {
-    const venta = await tx.venta.findUnique({ where: { id }, include: { items: true } });
+    const venta = await tx.venta.findUnique({ where: { id }, include: { items: { include: { categoria: true } } } });
     if (!venta || venta.estado === "ANULADA") throw new Error("La factura no existe o ya está anulada");
     await tx.venta.update({
       where: { id },
@@ -119,7 +122,7 @@ export async function anularVenta(form: FormData) {
       entidadId: id,
       detalle: { numero: venta.numero, total: venta.total, motivo },
     }, tx);
-    for (const i of venta.items) {
+    for (const i of venta.items.filter((i) => !i.categoria.esServicio)) {
       await registrarMovimiento(tx, {
         localId: venta.localId,
         categoriaId: i.categoriaId,

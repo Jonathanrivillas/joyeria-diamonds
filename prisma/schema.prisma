@@ -64,6 +64,7 @@ model Categoria {
   controlaPeso        Boolean         @default(true)
   precioGramoSugerido Int             @default(0) // COP por gramo
   precioUnidadSugerido Int            @default(0) // COP por pieza (categorías sin peso)
+  esServicio          Boolean         @default(false) // trabajos (fabricación, reparación): se cobran por valor y no tocan inventario
   activa              Boolean         @default(true)
   existencias         Existencia[]
   movimientos         Movimiento[]

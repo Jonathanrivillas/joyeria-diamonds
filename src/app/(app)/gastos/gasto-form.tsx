@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { registrarGasto } from "./actions";
 import { Alert, Button, Card, Chip, ChipGroup, ChoiceGrid, ChoiceTile, Field, FileButton, MoneyInput, Textarea } from "@/components/ui";
-import { TIPOS_GASTO_UI as TIPOS } from "@/components/gastos/tipos-gasto";
+import { GRUPOS_GASTO as GRUPOS } from "@/components/gastos/tipos-gasto";
 import { TAMANO_MAXIMO } from "@/lib/archivos";
 
 const LADO_MAXIMO = 1600; // píxeles: suficiente para leer un recibo
@@ -38,6 +38,7 @@ export function GastoForm({
   localDefecto?: number | null;
 }) {
   const [estado, accion, pendiente] = useActionState(registrarGasto, undefined);
+  const [grupo, setGrupo] = useState<string>("");
   const [tipo, setTipo] = useState<string>("");
   const [monto, setMonto] = useState(0);
   const [justificacion, setJustificacion] = useState("");
@@ -53,6 +54,7 @@ export function GastoForm({
 
   useEffect(() => {
     if (estado?.ok) {
+      setGrupo("");
       setTipo("");
       setMonto(0);
       setJustificacion("");
@@ -90,8 +92,18 @@ export function GastoForm({
     setArchivo(original.name);
   }
 
-  const textoBoton = !tipo
+  const subtipos = GRUPOS.find((g) => g.id === grupo)?.subtipos;
+
+  function escogerGrupo(id: string) {
+    setGrupo(id);
+    // Un grupo sin subtipos ya es el tipo; uno con subtipos espera a que escojan cuál.
+    setTipo(GRUPOS.find((g) => g.id === id)?.subtipos ? "" : id);
+  }
+
+  const textoBoton = !grupo
     ? "Escoja el tipo de gasto"
+    : !tipo
+      ? "Escoja cuál gasto del presupuesto"
     : monto <= 0
       ? "Escriba cuánto costó"
       : justificacion.trim().length < 5
@@ -121,20 +133,32 @@ export function GastoForm({
         <Field label={`${n(1)}. ¿Qué tipo de gasto es?`}>
           <input type="hidden" name="tipo" value={tipo} />
           <ChoiceGrid columns={2}>
-            {TIPOS.map((t, i) => (
+            {GRUPOS.map((g, i) => (
               <ChoiceTile
-                key={t.id}
+                key={g.id}
                 layout="inline"
-                selected={tipo === t.id}
-                onClick={() => setTipo(t.id)}
-                icon={t.icon}
-                title={t.nombre}
-                description={t.detalle}
-                className={i === TIPOS.length - 1 && TIPOS.length % 2 === 1 ? "col-span-2" : undefined}
+                selected={grupo === g.id}
+                onClick={() => escogerGrupo(g.id)}
+                icon={g.icon}
+                title={g.nombre}
+                description={g.detalle}
+                className={i === GRUPOS.length - 1 && GRUPOS.length % 2 === 1 ? "col-span-2" : undefined}
               />
             ))}
           </ChoiceGrid>
         </Field>
+
+        {subtipos && (
+          <Field label="¿Cuál gasto del presupuesto es?">
+            <ChipGroup>
+              {subtipos.map((st) => (
+                <Chip key={st.id} selected={tipo === st.id} onClick={() => setTipo(st.id)}>
+                  {st.nombre}
+                </Chip>
+              ))}
+            </ChipGroup>
+          </Field>
+        )}
 
         <MoneyInput name="monto" label={`${n(2)}. ¿Cuánto costó?`} value={monto} onChange={setMonto} size="xl" />
 
