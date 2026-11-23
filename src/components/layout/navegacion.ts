@@ -7,6 +7,7 @@ import {
   Receipt,
   Settings,
   ShoppingBag,
+  Truck,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -26,11 +27,12 @@ export const MODULOS = {
   facturas: { href: "/ventas", label: "Facturas", detalle: "Ventas ya hechas", icon: Receipt },
   reportes: { href: "/reportes", label: "Reportes", detalle: "Cierre y gráficos", icon: FileBarChart },
   traslados: { href: "/traslados", label: "Traslados", detalle: "Mover entre locales", icon: ArrowLeftRight, admin: true },
+  proveedores: { href: "/proveedores", label: "Proveedores", detalle: "A quién le compramos", icon: Truck, admin: true },
   admin: { href: "/admin", label: "Configuración", detalle: "Usuarios e historial", icon: Settings, admin: true },
 } satisfies Record<string, Modulo>;
 
 export const PRINCIPALES: Modulo[] = [MODULOS.inicio, MODULOS.vender, MODULOS.inventario, MODULOS.gastos, MODULOS.arqueo];
-export const OTROS: Modulo[] = [MODULOS.facturas, MODULOS.reportes, MODULOS.traslados, MODULOS.admin];
+export const OTROS: Modulo[] = [MODULOS.facturas, MODULOS.reportes, MODULOS.traslados, MODULOS.proveedores, MODULOS.admin];
 
 export function esActivo(path: string, href: string) {
   if (href === "/") return path === "/";

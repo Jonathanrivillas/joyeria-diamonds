@@ -1,4 +1,4 @@
-import { Hammer, HandCoins, MoreHorizontal, Package, PiggyBank, type LucideIcon } from "lucide-react";
+import { Hammer, HandCoins, MoreHorizontal, Package, PiggyBank, Truck, type LucideIcon } from "lucide-react";
 
 export type GrupoGasto = {
   id: string;
@@ -26,6 +26,8 @@ export const GRUPOS_GASTO: GrupoGasto[] = [
   { id: "TALLERES", nombre: "Talleres", detalle: "Arreglos y trabajos de taller", icon: Hammer },
   { id: "COMISIONES", nombre: "Comisiones", detalle: "Pago de comisiones", icon: HandCoins },
   { id: "INSUMOS", nombre: "Insumos", detalle: "Bolsas, estuches, aseo...", icon: Package },
+  // Al escogerlo se pide el proveedor (Gasto.proveedorId).
+  { id: "PROVEEDOR", nombre: "Pago a proveedor", detalle: "Plata que se le paga a un proveedor", icon: Truck },
 ];
 
 /** Grupo al que pertenece un tipo guardado (un subtipo de Presupuesto, o el grupo mismo). */

@@ -10,6 +10,7 @@ import { Button, Card, CardHeader, CardLink, Icon, List, PageContainer, PageHead
 import { MODULOS } from "@/components/layout/navegacion";
 import { ArqueoHoyResumen } from "@/components/arqueo/arqueo-estado";
 import { VentaFila } from "@/components/ventas/venta-fila";
+import { letraBonita, FRASE_NEGOCIO } from "@/lib/fuentes";
 
 /** Acceso rápido a un módulo: liviano, con flecha, para no competir con "Nueva venta". */
 function Acceso({ href, titulo, texto, icon }: { href: string; titulo: string; texto: string; icon: LucideIcon }) {
@@ -61,6 +62,11 @@ export default async function InicioPage() {
       <PageHeader
         eyebrow={fechaLarga(new Date())}
         title={`${saludo()}, ${primerNombre}`}
+        center={
+          <p className={`${letraBonita.className} text-2xl leading-tight text-neutral-700 sm:text-3xl`}>
+            {FRASE_NEGOCIO}
+          </p>
+        }
         actions={
           <Button href={MODULOS.vender.href} size="lg" icon={MODULOS.vender.icon}>
             Nueva venta

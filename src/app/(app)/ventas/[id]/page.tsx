@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { Home, ShoppingBag, Ban } from "lucide-react";
+import { Home, ShoppingBag, Ban, RotateCw, FileCheck } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireSesion } from "@/lib/session";
-import { cop, gramos, fechaHora, METODOS_PAGO } from "@/lib/format";
+import { cop, gramos, fechaHora, METODOS_PAGO, canalVenta } from "@/lib/format";
 import {
   Alert,
   Button,
@@ -17,12 +17,13 @@ import {
   PageHeader,
   PrintButton,
   StatusBadge,
+  SubmitButton,
   Table,
   Td,
   Th,
   Tr,
 } from "@/components/ui";
-import { anularVenta } from "../actions";
+import { anularVenta, reintentarFactura } from "../actions";
 
 export default async function VentaDetallePage({
   params,
@@ -36,7 +37,7 @@ export default async function VentaDetallePage({
   const s = await requireSesion();
   const v = await db.venta.findUnique({
     where: { id: Number(id) },
-    include: { local: true, usuario: true, items: { include: { categoria: true } } },
+    include: { local: true, usuario: true, proveedor: true, items: { include: { categoria: true } } },
   });
   if (!v) notFound();
   if (s.rol !== "ADMIN" && v.localId !== s.localId) notFound();
@@ -95,14 +96,23 @@ export default async function VentaDetallePage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <LabeledValue label="Cliente">
             <p>{v.clienteNombre ?? "Consumidor final"}</p>
-            {v.clienteDocumento && <p className="text-neutral-500">C.C. {v.clienteDocumento}</p>}
+            {v.clienteDocumento && (
+              <p className="text-neutral-500">
+                {v.clienteTipoDoc ?? "C.C."} {v.clienteDocumento}
+              </p>
+            )}
           </LabeledValue>
           <LabeledValue label="Atendió">{v.usuario.nombre}</LabeledValue>
-          <LabeledValue label="Forma de pago">{METODOS_PAGO[v.metodoPago]}</LabeledValue>
+          <LabeledValue label="Forma de pago">
+            <p>{METODOS_PAGO[v.metodoPago]}</p>
+            {v.proveedor && <p className="text-neutral-500">Llegó a la cuenta de {v.proveedor.nombre}</p>}
+          </LabeledValue>
+          <LabeledValue label="Dónde se vendió">{canalVenta(v)}</LabeledValue>
         </div>
+
 
         <Table>
           <thead>
@@ -155,22 +165,60 @@ export default async function VentaDetallePage({
         )}
       </Card>
 
+            {v.facturaElectronica && v.estado === "ACTIVA" && (
+        <div className="no-print">
+          {v.alegraEstado === "ENVIADA" ? (
+            <Alert tone="success" title="Factura electrónica creada">
+              <span className="inline-flex items-center gap-2">
+                <Icon icon={FileCheck} /> Factura {v.alegraNumero} en Alegra
+                {v.clienteCorreo && <> · se envía a {v.clienteCorreo}</>}
+              </span>
+            </Alert>
+          ) : v.alegraEstado === "ENVIANDO" ? (
+            <Alert tone="info" title="Enviando la factura electrónica...">
+              Espere un momento y recargue la página.
+            </Alert>
+          ) : (
+            <Alert tone="warning" title="La factura electrónica no se pudo crear">
+              <p>{v.alegraError ?? "Quedó pendiente de enviar a Alegra."}</p>
+              <p className="mt-1">La venta sí quedó guardada. Puede intentarlo otra vez.</p>
+              <form action={reintentarFactura} className="mt-3">
+                <input type="hidden" name="id" value={v.id} />
+                <SubmitButton variant="secondary" loadingText="Enviando a Alegra...">
+                  <Icon icon={RotateCw} /> Reintentar factura electrónica
+                </SubmitButton>
+              </form>
+            </Alert>
+          )}
+        </div>
+      )}
+
+
       {s.rol === "ADMIN" && v.estado === "ACTIVA" && (
         <Card padding="md" className="no-print">
           <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-base text-neutral-600">¿Se equivocó en esta factura? Puede anularla y las piezas vuelven al inventario.</p>
-          <ConfirmButton
-            action={anularVenta}
-            variant="danger-outline"
-            icon={<Icon icon={Ban} />}
-            label="Anular factura"
-            title={`¿Anular la factura ${v.numero}?`}
-            message={<>La venta de {cop(v.total)} quedará anulada y las piezas vuelven al inventario. Esto no se puede deshacer.</>}
-            confirmLabel="Sí, anular la factura"
-            fields={{ id: v.id }}
-          >
-            <Input label="¿Por qué la anula?" name="motivo" required placeholder="Ej: se digitó mal el peso" />
-          </ConfirmButton>
+            <p className="text-base text-neutral-600">¿Se equivocó en esta factura? Puede anularla y las piezas vuelven al inventario.</p>
+            <ConfirmButton
+              action={anularVenta}
+              variant="danger-outline"
+              icon={<Icon icon={Ban} />}
+              label="Anular factura"
+              title={`¿Anular la factura ${v.numero}?`}
+            message={
+              <>
+                La venta de {cop(v.total)} quedará anulada y las piezas vuelven al inventario. Esto no se puede deshacer.
+                {v.alegraEstado === "ENVIADA" && (
+                  <strong className="mt-2 block">
+                    Esta venta tiene factura electrónica {v.alegraNumero}: después de anular, haga la nota crédito en Alegra.
+                  </strong>
+                )}
+              </>
+            }
+              confirmLabel="Sí, anular la factura"
+              fields={{ id: v.id }}
+            >
+              <Input label="¿Por qué la anula?" name="motivo" required placeholder="Ej: se digitó mal el peso" />
+            </ConfirmButton>
           </div>
         </Card>
       )}

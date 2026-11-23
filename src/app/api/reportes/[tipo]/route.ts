@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSesion, getAlcance } from "@/lib/session";
 import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
-import { TIPOS_GASTO } from "@/lib/format";
+import { TIPOS_GASTO, canalVenta } from "@/lib/format";
 
 function csv(filas: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
@@ -34,7 +34,7 @@ export async function GET(
     const items = await db.ventaItem.findMany({
       where: { venta: { ...whereLocal, fecha: { gte: desde, lte: hasta } } },
       include: {
-        venta: { include: { local: true, usuario: true } },
+        venta: { include: { local: true, usuario: true, proveedor: true } },
         categoria: true,
       },
       orderBy: { venta: { fecha: "asc" } },
@@ -47,6 +47,8 @@ export async function GET(
         "Vendedor",
         "Cliente",
         "Pago",
+        "Llegó a",
+        "Dónde se vendió",
         "Estado",
         "Categoría",
         "Descripción",
@@ -63,6 +65,8 @@ export async function GET(
         i.venta.usuario.nombre,
         i.venta.clienteNombre,
         i.venta.metodoPago,
+        i.venta.proveedor ? i.venta.proveedor.nombre : "Joyería",
+        canalVenta(i.venta),
         i.venta.estado,
         i.categoria.nombre,
         i.descripcion,
@@ -76,7 +80,7 @@ export async function GET(
   } else if (tipo === "gastos") {
     const gastos = await db.gasto.findMany({
       where: { ...whereLocal, fecha: { gte: desde, lte: hasta } },
-      include: { local: true, usuario: true },
+      include: { local: true, usuario: true, proveedor: true },
       orderBy: { fecha: "asc" },
     });
     filas = [
@@ -84,6 +88,7 @@ export async function GET(
         "Fecha",
         "Local",
         "Tipo",
+        "Proveedor",
         "Justificación",
         "Registró",
         "Monto",
@@ -94,6 +99,7 @@ export async function GET(
         x.fecha.toLocaleString("es-CO", { timeZone: ZONA_HORARIA }),
         x.local.nombre,
         TIPOS_GASTO[x.tipo] ?? x.tipo,
+        x.proveedor?.nombre ?? "",
         x.justificacion,
         x.usuario.nombre,
         x.monto,

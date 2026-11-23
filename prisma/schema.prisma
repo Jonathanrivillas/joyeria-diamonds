@@ -12,38 +12,39 @@ datasource db {
 }
 
 model Local {
-  id             Int          @id @default(autoincrement())
-  nombre         String
-  direccion      String       @default("")
-  prefijoFactura String       @unique
-  consecutivo    Int          @default(0)
-  usuarios       Usuario[]
-  existencias    Existencia[]
-  movimientos    Movimiento[]
-  ventas         Venta[]
-  gastos         Gasto[]
-  arqueos        Arqueo[]
-  trasladosSalida  Traslado[] @relation("origen")
-  trasladosEntrada Traslado[] @relation("destino")
+  id               Int          @id @default(autoincrement())
+  nombre           String
+  direccion        String       @default("")
+  prefijoFactura   String       @unique
+  consecutivo      Int          @default(0)
+  usuarios         Usuario[]
+  existencias      Existencia[]
+  movimientos      Movimiento[]
+  ventas           Venta[]
+  gastos           Gasto[]
+  arqueos          Arqueo[]
+  trasladosSalida  Traslado[]   @relation("origen")
+  trasladosEntrada Traslado[]   @relation("destino")
+  piezas           Pieza[]
 }
 
 model Usuario {
-  id           Int          @id @default(autoincrement())
-  nombre       String
-  email        String       @unique
-  passwordHash String
-  rol          String // ADMIN | VENDEDOR
-  activo       Boolean      @default(true)
-  sesionVersion Int      @default(0)
-  debeCambiarClave Boolean  @default(false)
-  localId      Int?
-  local        Local?       @relation(fields: [localId], references: [id])
-  movimientos  Movimiento[]
-  ventas       Venta[]
-  gastos       Gasto[]
-  arqueos      Arqueo[]
-  traslados    Traslado[]
-  preciosGramo PrecioGramo[]
+  id               Int           @id @default(autoincrement())
+  nombre           String
+  email            String        @unique
+  passwordHash     String
+  rol              String // ADMIN | VENDEDOR
+  activo           Boolean       @default(true)
+  sesionVersion    Int           @default(0)
+  debeCambiarClave Boolean       @default(false)
+  localId          Int?
+  local            Local?        @relation(fields: [localId], references: [id])
+  movimientos      Movimiento[]
+  ventas           Venta[]
+  gastos           Gasto[]
+  arqueos          Arqueo[]
+  traslados        Traslado[]
+  preciosGramo     PrecioGramo[]
 }
 
 /// Precio del gramo de oro. El vigente es el último registrado; se confirma cada día.
@@ -58,69 +59,93 @@ model PrecioGramo {
 }
 
 model Categoria {
-  id                  Int             @id @default(autoincrement())
-  nombre              String          @unique
-  orden               Int             @default(0)
-  controlaPeso        Boolean         @default(true)
-  precioGramoSugerido Int             @default(0) // COP por gramo
-  precioUnidadSugerido Int            @default(0) // COP por pieza (categorías sin peso)
-  esServicio          Boolean         @default(false) // trabajos (fabricación, reparación): se cobran por valor y no tocan inventario
-  activa              Boolean         @default(true)
-  existencias         Existencia[]
-  movimientos         Movimiento[]
-  ventaItems          VentaItem[]
-  arqueoDetalles      ArqueoDetalle[]
-  trasladoItems       TrasladoItem[]
+  id                   Int             @id @default(autoincrement())
+  nombre               String          @unique
+  orden                Int             @default(0)
+  controlaPeso         Boolean         @default(true)
+  precioGramoSugerido  Int             @default(0) // COP por gramo
+  precioUnidadSugerido Int             @default(0) // COP por pieza (categorías sin peso)
+  esServicio           Boolean         @default(false) // trabajos (fabricación, reparación): se cobran por valor y no tocan inventario
+  activa               Boolean         @default(true)
+  existencias          Existencia[]
+  movimientos          Movimiento[]
+  ventaItems           VentaItem[]
+  arqueoDetalles       ArqueoDetalle[]
+  trasladoItems        TrasladoItem[]
+  alegraItemId         String? // id del producto en Alegra
+  // Joyas preciosas: cada pieza tiene su código y su propio precio (modelo Pieza).
+  porPieza             Boolean         @default(false)
+  piezas               Pieza[]
 }
 
 model Existencia {
-  id          Int       @id @default(autoincrement())
-  localId     Int
-  categoriaId Int
-  pesoCg      Int       @default(0)
-  cantidad    Int       @default(0)
-  local       Local     @relation(fields: [localId], references: [id])
-  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  id             Int       @id @default(autoincrement())
+  localId        Int
+  categoriaId    Int
+  pesoCg         Int       @default(0)
+  cantidad       Int       @default(0)
+  // Costo de compra conocido (solo de la mercancía ingresada con precio). "Medida" = centigramos
+  // si la categoría controla peso, o piezas si no. Lo que no tiene costo es lo más viejo y sale primero.
+  medidaConCosto Int       @default(0)
+  costoTotal     Float     @default(0) // COP que costó esa parte con costo
+  local          Local     @relation(fields: [localId], references: [id])
+  categoria      Categoria @relation(fields: [categoriaId], references: [id])
 
   @@unique([localId, categoriaId])
 }
 
 model Movimiento {
-  id          Int       @id @default(autoincrement())
-  fecha       DateTime  @default(now())
+  id          Int        @id @default(autoincrement())
+  fecha       DateTime   @default(now())
   tipo        String // ENTRADA | VENTA | ANULACION | TRASLADO_SALIDA | TRASLADO_ENTRADA | AJUSTE_ARQUEO
   pesoCg      Int // con signo: + entra, - sale
   cantidad    Int // con signo
   referencia  String?
   nota        String?
+  costo       Float      @default(0) // COP de costo conocido que entró (+) o salió (-) con este movimiento
+  proveedorId Int? // ENTRADA comprada a un proveedor
   localId     Int
   categoriaId Int
   usuarioId   Int
-  local       Local     @relation(fields: [localId], references: [id])
-  categoria   Categoria @relation(fields: [categoriaId], references: [id])
-  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  local       Local      @relation(fields: [localId], references: [id])
+  categoria   Categoria  @relation(fields: [categoriaId], references: [id])
+  usuario     Usuario    @relation(fields: [usuarioId], references: [id])
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id])
 
   @@index([localId, fecha])
   @@index([categoriaId, fecha])
 }
 
 model Venta {
-  id              Int         @id @default(autoincrement())
-  numero          String      @unique
-  fecha           DateTime    @default(now())
-  clienteNombre   String?
-  clienteDocumento String?
-  metodoPago      String // EFECTIVO | TRANSFERENCIA | TARJETA
-  total           Int
-  estado          String      @default("ACTIVA") // ACTIVA | ANULADA
-  motivoAnulacion String?
-  anuladaPorId     Int?
-  anuladaEn        DateTime?
-  localId         Int
-  usuarioId       Int
-  local           Local       @relation(fields: [localId], references: [id])
-  usuario         Usuario     @relation(fields: [usuarioId], references: [id])
-  items           VentaItem[]
+  id                 Int         @id @default(autoincrement())
+  numero             String      @unique
+  fecha              DateTime    @default(now())
+  clienteNombre      String?
+  clienteDocumento   String?
+  clienteTipoDoc     String? // CC | NIT | CE | PP
+  clienteCorreo      String?
+  facturaElectronica Boolean     @default(false)
+  alegraEstado       String? // PENDIENTE | ENVIADA | ERROR
+  alegraId           String? // id de la factura en Alegra
+  alegraNumero       String? // número que muestra Alegra
+  alegraError        String? // último error, para mostrarlo y reintentar
+  metodoPago         String // EFECTIVO | TRANSFERENCIA | TARJETA
+  canal              String      @default("TIENDA") // TIENDA | REDES
+  red                String? // WHATSAPP | INSTAGRAM | FACEBOOK | OTRA (solo si canal = REDES)
+  redOtra            String? // nombre de la red cuando red = OTRA
+  // Transferencia que le llegó a la cuenta de un proveedor (la plata es de la joyería). Null = a la joyería.
+  proveedorId        Int?
+  proveedor          Proveedor?  @relation(fields: [proveedorId], references: [id])
+  total              Int
+  estado             String      @default("ACTIVA") // ACTIVA | ANULADA
+  motivoAnulacion    String?
+  anuladaPorId       Int?
+  anuladaEn          DateTime?
+  localId            Int
+  usuarioId          Int
+  local              Local       @relation(fields: [localId], references: [id])
+  usuario            Usuario     @relation(fields: [usuarioId], references: [id])
+  items              VentaItem[]
 
   @@index([localId, fecha])
 }
@@ -135,25 +160,34 @@ model VentaItem {
   precioGramo Int
   hechura     Int       @default(0)
   subtotal    Int
+  // Costo de compra de lo vendido (solo la parte con costo conocido). Sirve para la ganancia
+  // y para devolver el costo al inventario si se anula.
+  costoMedida Int       @default(0) // centigramos (o piezas) de esta línea que tenían costo
+  costo       Float     @default(0) // COP que costó esa parte
+  piezaId     Int? // joya preciosa vendida (categorías porPieza)
+  pieza       Pieza?    @relation(fields: [piezaId], references: [id])
   venta       Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
 }
 
 model Gasto {
-  id            Int      @id @default(autoincrement())
-  fecha         DateTime @default(now())
-  tipo          String // NOMINA | ARRIENDO | SERVICIOS | INSUMOS | OTROS
-  monto         Int
-  justificacion String
-  soporte       String?
-  localId       Int
-  usuarioId     Int
-  local         Local    @relation(fields: [localId], references: [id])
-  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
-  estado          String    @default("ACTIVO") // ACTIVO | ANULADO
+  id              Int        @id @default(autoincrement())
+  fecha           DateTime   @default(now())
+  tipo            String // ver GRUPOS_GASTO (PROVEEDOR = pago a un proveedor)
+  monto           Int
+  justificacion   String
+  soporte         String?
+  proveedorId     Int? // solo cuando tipo = PROVEEDOR
+  proveedor       Proveedor? @relation(fields: [proveedorId], references: [id])
+  localId         Int
+  usuarioId       Int
+  local           Local      @relation(fields: [localId], references: [id])
+  usuario         Usuario    @relation(fields: [usuarioId], references: [id])
+  estado          String     @default("ACTIVO") // ACTIVO | ANULADO
   motivoAnulacion String?
   anuladoPorId    Int?
   anuladoEn       DateTime?
+
   @@index([localId, fecha])
 }
 
@@ -175,17 +209,17 @@ model Arqueo {
 }
 
 model ArqueoDetalle {
-  id               Int       @id @default(autoincrement())
-  arqueoId         Int
-  categoriaId      Int
-  pesoSistemaCg    Int
-  cantidadSistema  Int
-  pesoContadoCg    Int?
-  cantidadContada  Int?
-  estado           String? // OK | SOBRA | FALTA
-  observacion      String?
-  arqueo           Arqueo    @relation(fields: [arqueoId], references: [id], onDelete: Cascade)
-  categoria        Categoria @relation(fields: [categoriaId], references: [id])
+  id              Int       @id @default(autoincrement())
+  arqueoId        Int
+  categoriaId     Int
+  pesoSistemaCg   Int
+  cantidadSistema Int
+  pesoContadoCg   Int?
+  cantidadContada Int?
+  estado          String? // OK | SOBRA | FALTA
+  observacion     String?
+  arqueo          Arqueo    @relation(fields: [arqueoId], references: [id], onDelete: Cascade)
+  categoria       Categoria @relation(fields: [categoriaId], references: [id])
 }
 
 model Traslado {
@@ -223,7 +257,6 @@ model IntentoLogin {
   @@index([ip, fecha])
 }
 
-
 /// Registro de acciones delicadas: quién, qué, cuándo y desde dónde. Nunca se borra.
 model Auditoria {
   id            Int      @id @default(autoincrement())
@@ -238,4 +271,42 @@ model Auditoria {
 
   @@index([fecha])
   @@index([entidad, entidadId])
+}
+
+/// A quién le compra la joyería (oro, insumos, servicios). Nunca se borra: se desactiva.
+model Proveedor {
+  id        Int          @id @default(autoincrement())
+  nombre    String       @unique
+  documento String       @default("") // NIT o cédula
+  telefono  String       @default("")
+  notas     String       @default("") // ej. "oro 18k", "cuenta Bancolombia 123..."
+  activo    Boolean      @default(true)
+  creadoEn  DateTime     @default(now())
+  gastos    Gasto[] // lo que la joyería le ha pagado
+  ventas    Venta[] // ventas de la joyería cuya plata llegó a la cuenta de este proveedor
+  compras   Movimiento[] // mercancía que se le compró (entradas con precio)
+  piezas    Pieza[] // joyas preciosas que se le compraron
+}
+
+/// Joya preciosa (esmeraldas, etc.): se vende por pieza, con su código y su propio precio.
+/// La Existencia de su categoría sigue sumando peso y piezas, para arqueos y reportes.
+model Pieza {
+  id          Int         @id @default(autoincrement())
+  codigo      String      @unique // ej. JP-0001
+  tipo        String // ANILLO | TOPOS | DIJE | OTRO
+  descripcion String      @default("")
+  pesoCg      Int
+  precio      Int // precio de venta
+  costo       Float       @default(0) // costo de compra (0 = sin costo registrado)
+  estado      String      @default("DISPONIBLE") // DISPONIBLE | VENDIDA
+  localId     Int
+  categoriaId Int
+  proveedorId Int?
+  creadaEn    DateTime    @default(now())
+  local       Local       @relation(fields: [localId], references: [id])
+  categoria   Categoria   @relation(fields: [categoriaId], references: [id])
+  proveedor   Proveedor?  @relation(fields: [proveedorId], references: [id])
+  ventaItems  VentaItem[]
+
+  @@index([localId, estado])
 }

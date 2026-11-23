@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Banknote, Check, CreditCard, Plus, Search, SearchX, Smartphone, Trash2, Pencil, ShoppingBag, UserPlus } from "lucide-react";
+import { ArrowRight, Banknote, Check, CreditCard, Plus, Search, SearchX, Smartphone, Trash2, Pencil, ShoppingBag, UserPlus, FileText, Store } from "lucide-react";
 import { publicarLocalVenta } from "@/components/ventas/local-venta";
 import { crearVenta } from "../actions";
-import { cop, gramos, parseGramos } from "@/lib/format";
+import { cop, gramos, parseGramos, TIPOS_JOYA } from "@/lib/format";
 import {
   Alert,
   BackLink,
@@ -30,11 +30,14 @@ import {
   QuantityStepper,
   Section,
   Stepper,
+  Select,
 } from "@/components/ui";
 
 /** esServicio: fabricación o reparación. Se cobra el valor que se escriba y no toca el inventario. */
-type Cat = { id: number; nombre: string; controlaPeso: boolean; esServicio: boolean; precio: number };
+/** porPieza: joyas preciosas, se escoge la joya exacta por su código y se cobra su precio. */
+type Cat = { id: number; nombre: string; controlaPeso: boolean; esServicio: boolean; porPieza?: boolean; precio: number };
 type Ex = { localId: number; categoriaId: number; pesoCg: number; cantidad: number };
+type Joya = { id: number; codigo: string; tipo: string; descripcion: string; pesoCg: number; precio: number; localId: number; categoriaId: number };
 type Item = {
   key: number;
   categoriaId: number;
@@ -43,6 +46,7 @@ type Item = {
   cantidad: number;
   precio: number;
   subtotal: number;
+  piezaId?: number;
 };
 type Paso = "elegir" | "pieza" | "resumen" | "cobrar";
 type Metodo = "EFECTIVO" | "TRANSFERENCIA" | "TARJETA";
@@ -67,7 +71,18 @@ export function VentaForm({
   localDefecto,
   categorias,
   existencias,
+  frase,
+  facturaElectronica = false,
+  proveedores = [],
+  joyas = [],
 }: {
+  /** Joyas preciosas disponibles en todos los locales (se filtran por el local de la venta). */
+  joyas?: Joya[];
+  /** Proveedores activos: una transferencia puede llegar a la cuenta de uno de ellos. */
+  proveedores?: { id: number; nombre: string }[];
+  frase?: React.ReactNode;
+  /** Venta con factura electrónica: pide los datos del cliente y la envía a Alegra. */
+  facturaElectronica?: boolean;
   esAdmin: boolean;
   locales: { id: number; nombre: string }[];
   localDefecto: number | null;
@@ -88,15 +103,27 @@ export function VentaForm({
   const [precio, setPrecio] = useState(0);
   const [cambiarPrecio, setCambiarPrecio] = useState(false);
   const [descripcion, setDescripcion] = useState("");
+  const [buscarJoya, setBuscarJoya] = useState("");
 
   // Cobro
   const [metodo, setMetodo] = useState<Metodo | null>(null);
   const [recibido, setRecibido] = useState(0);
+  // A qué cuenta llegó la transferencia: null = a la joyería; un id = a ese proveedor.
+  const [proveedorId, setProveedorId] = useState<number | null>(null);
   const [verCliente, setVerCliente] = useState(false);
   const [cliente, setCliente] = useState("");
   const [documento, setDocumento] = useState("");
-
+  const facturaE = facturaElectronica;
+  const [tipoDoc, setTipoDoc] = useState<"CC" | "NIT" | "CE" | "PP">("CC");
+  const [correo, setCorreo] = useState("");
+  const facturaLista = !facturaE || (cliente.trim() && documento.trim() && /^\S+@\S+\.\S+$/.test(correo.trim()));
   const [buscar, setBuscar] = useState("");
+
+  const [canal, setCanal] = useState<"TIENDA" | "REDES">("TIENDA");
+  const [red, setRed] = useState<"WHATSAPP" | "INSTAGRAM" | "FACEBOOK" | "OTRA" | null>(null);
+  const [redOtra, setRedOtra] = useState("");
+  const canalListo = canal === "TIENDA" || (red !== null && (red !== "OTRA" || redOtra.trim().length > 0));
+
 
   // La barra superior muestra el local de esta venta.
   const nombreLocal = locales.find((l) => l.id === localId)?.nombre ?? null;
@@ -132,7 +159,29 @@ export function VentaForm({
     setPrecio(c.precio);
     setCambiarPrecio(false);
     setDescripcion("");
+    setBuscarJoya("");
     setPaso("pieza");
+  }
+
+  /** Joyas preciosas de una categoría que siguen libres en este local (las que ya van en la venta no). */
+  const joyasLibres = (categoriaId: number) =>
+    joyas.filter((j) => j.categoriaId === categoriaId && j.localId === localId && !carrito.some((i) => i.piezaId === j.id));
+
+  function agregarJoya(j: Joya) {
+    setCarrito((c) => [
+      ...c,
+      {
+        key: siguienteKey++,
+        categoriaId: j.categoriaId,
+        descripcion: [j.codigo, TIPOS_JOYA[j.tipo] ?? j.tipo, j.descripcion].filter(Boolean).join(" · "),
+        pesoCg: j.pesoCg,
+        cantidad: 1,
+        precio: j.precio,
+        subtotal: j.precio,
+        piezaId: j.id,
+      },
+    ]);
+    setPaso("resumen");
   }
 
   // ---- Pieza actual ----
@@ -174,6 +223,13 @@ export function VentaForm({
         clienteNombre: cliente,
         clienteDocumento: documento,
         metodoPago: metodo,
+        proveedorId: metodo === "TRANSFERENCIA" ? proveedorId : null,
+        canal,
+        red: canal === "REDES" ? red ?? undefined : undefined,
+        redOtra: red === "OTRA" ? redOtra : undefined,
+        facturaElectronica: facturaE,
+        clienteTipoDoc: facturaE ? tipoDoc : undefined,
+        clienteCorreo: facturaE ? correo : undefined,
         items: carrito.map((i) => ({
           categoriaId: i.categoriaId,
           descripcion: i.descripcion,
@@ -181,6 +237,7 @@ export function VentaForm({
           cantidad: i.cantidad,
           precioGramo: i.precio,
           hechura: 0,
+          piezaId: i.piezaId,
         })),
       });
       if (r.error) setError(r.error);
@@ -191,6 +248,7 @@ export function VentaForm({
   const paso3 = paso === "cobrar" ? 3 : paso === "resumen" ? 2 : 1;
   const agotado = (c: Cat) => {
     if (c.esServicio) return false;
+    if (c.porPieza) return joyasLibres(c.id).length === 0;
     const d = disponible(c.id);
     return d.cantidad <= 0 || (c.controlaPeso && d.pesoCg <= 0);
   };
@@ -213,21 +271,33 @@ export function VentaForm({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Vender"
-        back={{ href: "/", label: "Volver al inicio", mobileOnly: true }}
+        title={facturaE ? "Venta con factura electrónica" : "Vender"}
+        center={frase}
+        back={
+          facturaE
+            ? { href: "/ventas/nueva", label: "Volver a la venta normal" }
+            : { href: "/", label: "Volver al inicio", mobileOnly: true }
+        }
         actions={
-          elegirLocal && (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-lg font-semibold text-neutral-700">Vendiendo en:</span>
-              <ChipGroup>
-                {locales.map((l) => (
-                  <Chip key={l.id} selected={localId === l.id} disabled={carrito.length > 0} onClick={() => setLocalId(l.id)}>
-                    {l.nombre}
-                  </Chip>
-                ))}
-              </ChipGroup>
-            </div>
-          )
+          <>
+            {elegirLocal && (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-lg font-semibold text-neutral-700">Vendiendo en:</span>
+                <ChipGroup>
+                  {locales.map((l) => (
+                    <Chip key={l.id} selected={localId === l.id} disabled={carrito.length > 0} onClick={() => setLocalId(l.id)}>
+                      {l.nombre}
+                    </Chip>
+                  ))}
+                </ChipGroup>
+              </div>
+            )}
+            {!facturaE && (
+              <Button href="/ventas/nueva?fe=1" variant="secondary" size="lg" icon={FileText}>
+                Facturación electrónica
+              </Button>
+            )}
+          </>
         }
       />
       {elegirLocal && carrito.length > 0 && paso === "elegir" && (
@@ -285,7 +355,7 @@ export function VentaForm({
                     disabled={agotado(c)}
                     onClick={() => elegir(c)}
                     title={c.nombre}
-                    description={c.esServicio ? "Trabajo" : agotado(c) ? "Agotado" : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
+                    description={c.esServicio ? "Trabajo" : agotado(c) ? "Agotado" : c.porPieza ? `Hay ${piezas(joyasLibres(c.id).length).replace("pieza", "joya")}` : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
                   />
                 );
               })}
@@ -338,7 +408,64 @@ export function VentaForm({
         </div>
       )}
 
-      {paso === "pieza" && cat && !cat.esServicio && (
+      {/* PASO 1b (joyas preciosas): escoger la joya exacta por su código */}
+      {paso === "pieza" && cat?.porPieza && (
+        <div className="max-w-4xl space-y-4">
+          <BackLink onClick={() => setPaso("elegir")}>Escoger otro tipo de pieza</BackLink>
+          <Card>
+            <div className="space-y-4 p-5 sm:p-6">
+              <div>
+                <p className="text-base text-neutral-500">Está vendiendo</p>
+                <h2 className="text-2xl font-bold">{cat.nombre}</h2>
+                <p className="text-base text-neutral-500">Toque la joya que se lleva el cliente. Cada una tiene su precio.</p>
+              </div>
+              <Input
+                label="Buscar por código"
+                hideLabel
+                type="search"
+                value={buscarJoya}
+                onChange={(e) => setBuscarJoya(e.target.value)}
+                placeholder="Escriba el código de la etiqueta (ej. JP-0012)…"
+                prefix={<Icon icon={Search} size="sm" />}
+                className="pl-12"
+                autoFocus
+              />
+            </div>
+            {(() => {
+              const q = sinTildes(buscarJoya.trim());
+              const lista = joyasLibres(cat.id).filter(
+                (j) => !q || sinTildes(j.codigo).includes(q) || sinTildes(j.descripcion).includes(q) || sinTildes(TIPOS_JOYA[j.tipo] ?? "").includes(q)
+              );
+              return lista.length === 0 ? (
+                <EmptyState icon={SearchX} title={q ? `No hay ninguna joya con “${buscarJoya.trim()}” en este local.` : "No hay joyas disponibles en este local."} />
+              ) : (
+                <ul className="divide-y divide-neutral-100 border-t border-neutral-200">
+                  {lista.map((j) => (
+                    <li key={j.id}>
+                      <button
+                        type="button"
+                        onClick={() => agregarJoya(j)}
+                        className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-brand-50 active:scale-[0.99] sm:px-6"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-mono text-lg font-bold">{j.codigo}</span>
+                          <span className="block text-base text-neutral-600">
+                            {[TIPOS_JOYA[j.tipo] ?? j.tipo, j.descripcion, gramos(j.pesoCg)].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                        <span className="text-xl font-bold tabular-nums">{cop(j.precio)}</span>
+                        <Icon icon={Plus} className="text-brand-700" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </Card>
+        </div>
+      )}
+
+      {paso === "pieza" && cat && !cat.esServicio && !cat.porPieza && (
         <div className="max-w-4xl">
           <BackLink onClick={() => setPaso("elegir")}>Escoger otro tipo de pieza</BackLink>
           <Card>
@@ -492,6 +619,55 @@ export function VentaForm({
                 </div>
               </div>
 
+              <div className="space-y-3 p-5 sm:p-6">
+                <h2 className="text-xl font-bold text-neutral-800">¿Dónde se hizo la venta?</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <ChoiceTile selected={canal === "TIENDA"} onClick={() => setCanal("TIENDA")} icon={Store} title="En la tienda" className="p-5 text-xl" />
+                  <ChoiceTile selected={canal === "REDES"} onClick={() => setCanal("REDES")} icon={Smartphone} title="Por redes" className="p-5 text-xl" />
+                </div>
+                {canal === "REDES" && (
+                  <>
+                    <p className="text-lg text-neutral-700">¿Por cuál red?</p>
+                    <ChipGroup>
+                      {([
+                        ["WHATSAPP", "WhatsApp"],
+                        ["INSTAGRAM", "Instagram"],
+                        ["FACEBOOK", "Facebook"],
+                        ["OTRA", "Otra"],
+                      ] as const).map(([id, nombre]) => (
+                        <Chip key={id} selected={red === id} onClick={() => setRed(id)}>
+                          {nombre}
+                        </Chip>
+                      ))}
+                    </ChipGroup>
+                    {red === "OTRA" && (
+                      <Input label="¿Cuál?" value={redOtra} onChange={(e) => setRedOtra(e.target.value)} autoFocus />
+                    )}
+                  </>
+                )}
+              </div>
+
+              {metodo === "TRANSFERENCIA" && proveedores.length > 0 && (
+                <div className="space-y-3 p-5 sm:p-6">
+                  <h2 className="text-xl font-bold text-neutral-800">¿A qué cuenta llegó la plata?</h2>
+                  <ChipGroup>
+                    <Chip selected={proveedorId === null} onClick={() => setProveedorId(null)}>
+                      A la joyería
+                    </Chip>
+                    {proveedores.map((p) => (
+                      <Chip key={p.id} selected={proveedorId === p.id} onClick={() => setProveedorId(p.id)}>
+                        A {p.nombre}
+                      </Chip>
+                    ))}
+                  </ChipGroup>
+                  {proveedorId !== null && (
+                    <p className="text-base text-neutral-600">
+                      La venta es de la joyería; queda anotado que esa plata la tiene {proveedores.find((p) => p.id === proveedorId)?.nombre}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {metodo === "EFECTIVO" && (
                 <div className="space-y-3 p-5 sm:p-6">
                   <MoneyInput label="¿Con cuánto le pagan? (para calcular el cambio)" value={recibido} onChange={setRecibido} size="xl" />
@@ -509,8 +685,30 @@ export function VentaForm({
                 </div>
               )}
 
-              <div className="p-5 sm:p-6">
-                {!verCliente ? (
+              <div className="space-y-4 p-5 sm:p-6">
+                {facturaE && <h2 className="text-xl font-bold text-neutral-800">Datos del cliente para la factura electrónica</h2>}
+
+                {facturaE ? (
+                  <FormGrid>
+                    <Select
+                      label="Tipo de documento"
+                      value={tipoDoc}
+                      onChange={(e) => setTipoDoc(e.target.value as typeof tipoDoc)}
+                      options={[
+                        { value: "CC", label: "Cédula de ciudadanía" },
+                        { value: "NIT", label: "NIT (empresa)" },
+                        { value: "CE", label: "Cédula de extranjería" },
+                        { value: "PP", label: "Pasaporte" },
+                      ]}
+                    />
+                    <Input label="Número de documento" inputMode="numeric" value={documento} onChange={(e) => setDocumento(e.target.value)} />
+                    <Input label={tipoDoc === "NIT" ? "Nombre de la empresa" : "Nombre completo"} value={cliente} onChange={(e) => setCliente(e.target.value)} />
+                    <Input label="Correo (allá le llega la factura)" type="email" inputMode="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
+                    <p className="text-sm text-neutral-500 sm:col-span-2">
+                      Estos datos solo se usan para la factura electrónica de esta venta (Ley 1581 de 2012). Pregúntele al cliente si está de acuerdo.
+                    </p>
+                  </FormGrid>
+                ) : !verCliente ? (
                   <Button variant="link" icon={UserPlus} className="text-lg" onClick={() => setVerCliente(true)}>
                     Poner el nombre del cliente en la factura (si quiere)
                   </Button>
@@ -518,9 +716,6 @@ export function VentaForm({
                   <FormGrid>
                     <Input label="Nombre del cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} autoFocus />
                     <Input label="Cédula" inputMode="numeric" value={documento} onChange={(e) => setDocumento(e.target.value)} />
-                    <p className="text-sm text-neutral-500 sm:col-span-2">
-                      El nombre y la cédula solo se usan para la factura de esta venta (Ley 1581 de 2012). Pregúntele al cliente si está de acuerdo.
-                    </p>
                   </FormGrid>
                 )}
               </div>
@@ -528,8 +723,23 @@ export function VentaForm({
           </Card>
 
           <ActionBar>
-            <Button size="lg" block icon={Check} className="text-xl" disabled={!metodo} loading={pendiente} loadingText="Guardando la venta..." onClick={confirmar}>
-              {metodo ? `Confirmar la venta · ${cop(total)}` : "Primero toque la forma de pago"}
+            <Button
+              size="lg"
+              block
+              icon={Check}
+              className="text-xl"
+              disabled={!metodo || !canalListo || !facturaLista}
+              loading={pendiente}
+              loadingText={facturaE ? "Guardando y enviando la factura electrónica..." : "Guardando la venta..."}
+              onClick={confirmar}
+            >
+              {!metodo
+                ? "Primero toque la forma de pago"
+                : !canalListo
+                  ? "Toque por cuál red se vendió"
+                  : !facturaLista
+                    ? "Complete los datos de la factura"
+                    : `Confirmar la venta · ${cop(total)}`}
             </Button>
           </ActionBar>
         </div>

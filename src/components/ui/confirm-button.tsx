@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { Modal, ModalActions } from "./modal";
@@ -44,7 +44,9 @@ export function ConfirmButton({
   "aria-label"?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [sending, setSending] = useState(false);
+  // useOptimistic y no useState: la acción del formulario corre como transición y un
+  // useState normal no se pintaría hasta el final (el "Un momento..." nunca se vería).
+  const [sending, setSending] = useOptimistic(false);
 
   return (
     <>
@@ -56,11 +58,10 @@ export function ConfirmButton({
         <form
           className="space-y-5"
           action={async (f) => {
-            setSending(true);
+            setSending(true); // se pinta de inmediato; vuelve a false solo al terminar
             try {
               await action(f);
             } finally {
-              setSending(false);
               setOpen(false);
             }
           }}

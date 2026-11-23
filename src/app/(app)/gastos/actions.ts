@@ -29,6 +29,14 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   if (monto > 1_000_000_000) return { error: "El valor es demasiado alto. Revise el número." };
   if (justificacion.length > 500) return { error: "La explicación es muy larga (máximo 500 letras)." };
 
+  // Pago a proveedor: el proveedor es obligatorio y debe estar activo. En otros tipos no se guarda.
+  let proveedorId: number | null = null;
+  if (tipo === "PROVEEDOR") {
+    proveedorId = Number(form.get("proveedorId")) || null;
+    const p = proveedorId ? await db.proveedor.findFirst({ where: { id: proveedorId, activo: true } }) : null;
+    if (!p) return { error: "Toque a cuál proveedor se le pagó." };
+  }
+
   let soporte: string | null = null;
   const archivo = form.get("soporte");
   if (archivo instanceof File && archivo.size > 0) {
@@ -48,7 +56,7 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   }
 
   await db.gasto.create({
-    data: { localId, usuarioId: s.id, tipo, monto, justificacion, soporte },
+    data: { localId, usuarioId: s.id, tipo, monto, justificacion, soporte, proveedorId },
   });
   revalidatePath("/", "layout");
   return { ok: "Listo, el gasto quedó guardado. Puede anotar otro si necesita." };

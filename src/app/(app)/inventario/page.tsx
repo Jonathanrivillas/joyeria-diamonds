@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUp, PackagePlus, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, Gem, PackagePlus, ChevronRight } from "lucide-react";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { planillaDelDia } from "@/lib/consultas";
 import { aISO, inicioDia, parseFechaISO } from "@/lib/fechas";
@@ -44,11 +44,16 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
         subtitle={nombreLocal}
         help="Es la misma planilla del papel: lo que entró, lo que salió y lo que queda de cada tipo de pieza. Toque una categoría para ver todos sus movimientos."
         actions={
-          s.rol === "ADMIN" && (
-            <Button href="/inventario/entradas" icon={PackagePlus}>
-              Ingresar mercancía
+          <>
+            <Button href="/inventario/joyas" variant="secondary" icon={Gem}>
+              Joyas preciosas
             </Button>
-          )
+            {s.rol === "ADMIN" && (
+              <Button href="/inventario/entradas" icon={PackagePlus}>
+                Ingresar mercancía
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -115,7 +120,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           </thead>
           <tbody>
             {filas.map((f) => {
-              const href = `/inventario/${f.categoriaId}`;
+              const href = f.porPieza ? "/inventario/joyas" : `/inventario/${f.categoriaId}`;
               return (
                 <Tr key={f.categoriaId}>
                   <Td sticky>
@@ -123,6 +128,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
                       {f.nombre}
                     </Link>
                     {!f.controlaPeso && <span className="text-sm text-neutral-500">Se cuenta por piezas</span>}
+                    {f.porPieza && <span className="text-sm text-neutral-500">Cada joya con su código</span>}
                   </Td>
                   <Td numeric divider className={cn(md, "text-success-700")}>
                     {f.entradaPeso ? gramos(f.entradaPeso, false) : <NoValue />}

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requireSesion, getAlcance } from "@/lib/session";
 import { resumenRango } from "@/lib/consultas";
 import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
-import { cop, gramos, fecha, fechaLarga, METODOS_PAGO, TIPOS_GASTO, plural } from "@/lib/format";
+import { cop, gramos, fecha, fechaLarga, METODOS_PAGO, REDES, TIPOS_GASTO, plural } from "@/lib/format";
 import { rangoActivo, rangosRapidos } from "@/lib/rangos";
 import {
   Button,
@@ -38,10 +38,15 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
 
   const porLocal = await Promise.all(
     localesVista.map(async (l) => {
-      const [res, porMetodo, porTipo, arqueo, stock] = await Promise.all([
+      const [res, porMetodo, porCanal, porTipo, arqueo, stock] = await Promise.all([
         resumenRango(l.id, desde, hasta),
         db.venta.groupBy({
           by: ["metodoPago"],
+          where: { localId: l.id, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } },
+          _sum: { total: true },
+        }),
+        db.venta.groupBy({
+          by: ["canal"],
           where: { localId: l.id, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } },
           _sum: { total: true },
         }),
@@ -52,9 +57,67 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
         }),
         db.existencia.aggregate({ where: { localId: l.id }, _sum: { pesoCg: true } }),
       ]);
-      return { local: l, res, porMetodo, porTipo, arqueo, stock: stock._sum.pesoCg ?? 0 };
+      return { local: l, res, porMetodo, porCanal, porTipo, arqueo, stock: stock._sum.pesoCg ?? 0 };
     })
   );
+
+  // ¿Dónde se vendió? Tienda física vs. redes, y cada red por separado.
+  const ventasCanal = await db.venta.groupBy({
+    by: ["canal", "red", "redOtra"],
+    where: { ...whereLocal, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } },
+    _sum: { total: true },
+    _count: true,
+  });
+  const totalCanal = ventasCanal.reduce((a, v) => a + (v._sum.total ?? 0), 0);
+  const tienda = ventasCanal.filter((v) => v.canal !== "REDES");
+  const filaTienda = {
+    facturas: tienda.reduce((a, v) => a + v._count, 0),
+    total: tienda.reduce((a, v) => a + (v._sum.total ?? 0), 0),
+  };
+  // Las redes "Otra" se agrupan por nombre sin importar mayúsculas (TikTok = tiktok).
+  const redesMap = new Map<string, { nombre: string; facturas: number; total: number }>();
+  for (const v of ventasCanal.filter((v) => v.canal === "REDES")) {
+    const nombre = v.red === "OTRA" ? v.redOtra?.trim() || "Otra red" : REDES[v.red ?? ""] ?? "Sin red";
+    const clave = nombre.toLowerCase();
+    const r = redesMap.get(clave) ?? { nombre, facturas: 0, total: 0 };
+    r.facturas += v._count;
+    r.total += v._sum.total ?? 0;
+    redesMap.set(clave, r);
+  }
+  const filasRedes = [...redesMap.values()].sort((a, b) => b.total - a.total);
+  const filaRedes = {
+    facturas: filasRedes.reduce((a, r) => a + r.facturas, 0),
+    total: filasRedes.reduce((a, r) => a + r.total, 0),
+  };
+  const pct = (n: number) => (totalCanal > 0 ? `${Math.round((n / totalCanal) * 100)} %` : "—");
+
+  // Ganancia: solo de la parte vendida que tiene costo de compra registrado.
+  const [itemsGanancia, compras] = await Promise.all([
+    db.ventaItem.findMany({
+      where: { venta: { ...whereLocal, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } }, categoria: { esServicio: false } },
+      select: { pesoCg: true, cantidad: true, subtotal: true, costoMedida: true, costo: true, categoria: { select: { controlaPeso: true } } },
+    }),
+    db.movimiento.aggregate({
+      where: { ...whereLocal, tipo: "ENTRADA", costo: { gt: 0 }, fecha: { gte: desde, lte: hasta } },
+      _sum: { costo: true, pesoCg: true },
+      _count: true,
+    }),
+  ]);
+  const g = { vendidoConCosto: 0, costo: 0, gramosConCosto: 0, vendidoSinCosto: 0, gramosSinCosto: 0 };
+  for (const i of itemsGanancia) {
+    const medida = i.categoria.controlaPeso ? i.pesoCg : i.cantidad;
+    // Si una línea tiene parte con costo y parte sin costo, el precio se reparte en proporción.
+    const parteConCosto = medida > 0 ? Math.min(1, i.costoMedida / medida) : 0;
+    g.vendidoConCosto += i.subtotal * parteConCosto;
+    g.costo += i.costo;
+    g.vendidoSinCosto += i.subtotal * (1 - parteConCosto);
+    if (i.categoria.controlaPeso) {
+      g.gramosConCosto += i.costoMedida;
+      g.gramosSinCosto += i.pesoCg - i.costoMedida;
+    }
+  }
+  const ganancia = Math.round(g.vendidoConCosto - g.costo);
+  const margen = g.vendidoConCosto > 0 ? Math.round((ganancia / g.vendidoConCosto) * 100) : 0;
 
   // Gráficos: si es un solo día, se muestran los 7 días que terminan en ese día.
   const gDesde = unDia ? sumarDias(desde, -6) : desde;
@@ -102,7 +165,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
       <RangoFechas ruta="/reportes" rangos={rangos} activo={activo} desde={aISO(desde)} hasta={aISO(hasta)} max={aISO(hoy)} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {porLocal.map(({ local, res, porMetodo, porTipo, arqueo, stock }) => {
+        {porLocal.map(({ local, res, porMetodo, porCanal, porTipo, arqueo, stock }) => {
           const difArqueo = arqueo ? arqueo.pesoContadoCg - arqueo.pesoSistemaCg : 0;
           return (
             <Card key={local.id} padding="lg">
@@ -112,6 +175,11 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
                 {porMetodo.length > 0 && (
                   <p className="-mt-2 text-base text-neutral-500">
                     {porMetodo.map((m) => `${METODOS_PAGO[m.metodoPago]} ${cop(m._sum.total ?? 0)}`).join(" · ")}
+                  </p>
+                )}
+                {porCanal.length > 0 && (
+                  <p className="-mt-2 text-base text-neutral-500">
+                    {porCanal.map((c) => `${c.canal === "REDES" ? "Por redes" : "En la tienda"} ${cop(c._sum.total ?? 0)}`).join(" · ")}
                   </p>
                 )}
                 <DataRow label="Gastó" value={cop(res.totalGastos)} tone="danger" strong />
@@ -133,6 +201,85 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
           );
         })}
       </div>
+
+      <Card>
+        <CardHeader title="¿Dónde se vendió?" description="Ventas en la tienda física y por cada red social" />
+        {totalCanal === 0 ? (
+          <CardBody>
+            <EmptyState icon={BarChart3} title="Sin ventas en estas fechas." />
+          </CardBody>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Canal</Th>
+                <Th numeric>Facturas</Th>
+                <Th numeric>Vendió</Th>
+                <Th numeric>%</Th>
+              </tr>
+            </thead>
+            <tbody>
+              <Tr>
+                <Td className="font-semibold">En la tienda</Td>
+                <Td numeric>{filaTienda.facturas}</Td>
+                <Td numeric className="font-semibold">
+                  {cop(filaTienda.total)}
+                </Td>
+                <Td numeric>{pct(filaTienda.total)}</Td>
+              </Tr>
+              <Tr>
+                <Td className="font-semibold">Por redes</Td>
+                <Td numeric>{filaRedes.facturas}</Td>
+                <Td numeric className="font-semibold">
+                  {cop(filaRedes.total)}
+                </Td>
+                <Td numeric>{pct(filaRedes.total)}</Td>
+              </Tr>
+              {filasRedes.map((r) => (
+                <Tr key={r.nombre}>
+                  <Td className="pl-8 text-neutral-600">{r.nombre}</Td>
+                  <Td numeric className="text-neutral-600">
+                    {r.facturas}
+                  </Td>
+                  <Td numeric className="text-neutral-600">
+                    {cop(r.total)}
+                  </Td>
+                  <Td numeric className="text-neutral-600">
+                    {pct(r.total)}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </Card>
+
+      {/* Costos y ganancia: solo el administrador. */}
+      {s.rol === "ADMIN" && (
+      <Card>
+        <CardHeader title="Ganancia" description="Lo que se vendió menos lo que costó comprarlo (solo mercancía con precio de compra registrado)" />
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <DataRow label="Se vendió" value={cop(Math.round(g.vendidoConCosto))} />
+            <DataRow label="Costó comprarlo" value={cop(Math.round(g.costo))} tone="danger" />
+            <DataRow label={`Ganancia${margen ? ` (${margen} %)` : ""}`} value={cop(ganancia)} tone={ganancia >= 0 ? "success" : "danger"} strong />
+          </div>
+          {g.gramosConCosto > 0 && <p className="text-base text-neutral-500">{gramos(g.gramosConCosto)} vendidos con costo registrado.</p>}
+          {g.vendidoSinCosto > 0 && (
+            <p className="text-base text-neutral-500">
+              Además se vendieron {cop(Math.round(g.vendidoSinCosto))}
+              {g.gramosSinCosto > 0 && ` (${gramos(g.gramosSinCosto)})`} de mercancía sin precio de compra registrado (la que ya había antes). Esa no
+              cuenta en la ganancia.
+            </p>
+          )}
+          <DataRow
+            label={`Compras de mercancía en estas fechas (${plural(compras._count, "compra", "compras")})`}
+            value={`${cop(Math.round(compras._sum.costo ?? 0))}${compras._sum.pesoCg ? ` · ${gramos(compras._sum.pesoCg)}` : ""}`}
+            className="border-t border-neutral-200 pt-3"
+          />
+        </CardBody>
+      </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>

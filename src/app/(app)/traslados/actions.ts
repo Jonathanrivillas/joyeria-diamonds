@@ -25,6 +25,8 @@ export async function crearTraslado(
     return { error: "El local que envía y el que recibe deben ser distintos." };
   const cat = await db.categoria.findUnique({ where: { id: categoriaId } });
   if (!cat || cat.esServicio) return { error: "Ese tipo de pieza no existe." };
+  if (cat.porPieza)
+    return { error: "Las joyas preciosas se mueven una por una: Inventario → Joyas preciosas → la joya → Mover a otro local." };
   if (Number.isNaN(pesoCg) || (cat.controlaPeso && pesoCg <= 0))
     return { error: "Escriba cuánto pesa lo que va a mover." };
   if (!Number.isInteger(cantidad) || cantidad <= 0)
@@ -47,7 +49,8 @@ export async function crearTraslado(
         },
       });
       const ref = `TR-${t.id}`;
-      await registrarMovimiento(tx, {
+      // El costo de compra viaja con la mercancía al otro local.
+      const { costoSalida } = await registrarMovimiento(tx, {
         localId: origenId,
         categoriaId,
         usuarioId: s.id,
@@ -66,6 +69,7 @@ export async function crearTraslado(
         cantidad,
         referencia: ref,
         nota: nota ?? undefined,
+        costo: costoSalida,
       });
       await auditar(
         s,

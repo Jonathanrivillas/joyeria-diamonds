@@ -117,6 +117,7 @@ export const TIPOS_GASTO: Record<string, string> = {
   TALLERES: "Talleres",
   COMISIONES: "Comisiones",
   INSUMOS: "Insumos",
+  PROVEEDOR: "Pago a proveedor",
 };
 
 export const METODOS_PAGO: Record<string, string> = {
@@ -125,6 +126,27 @@ export const METODOS_PAGO: Record<string, string> = {
   TARJETA: "Tarjeta",
 };
 
+/** Tipos de joya preciosa (modelo Pieza). Aquí y no en lib/joyas.ts porque también se usa en el navegador. */
+export const TIPOS_JOYA: Record<string, string> = {
+  ANILLO: "Anillo",
+  TOPOS: "Topos",
+  DIJE: "Dije",
+  OTRO: "Otra",
+};
+
+export const REDES: Record<string, string> = {
+  WHATSAPP: "WhatsApp",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  OTRA: "Otra red",
+};
+
+export function canalVenta(v: { canal: string; red: string | null; redOtra: string | null }): string {
+  if (v.canal !== "REDES") return "En la tienda";
+  const red = v.red === "OTRA" ? v.redOtra || "Otra red" : REDES[v.red ?? ""] ?? "";
+  return red ? `Por redes · ${red}` : "Por redes";
+}
+
 export const TIPOS_MOVIMIENTO: Record<string, string> = {
   ENTRADA: "Ingresó mercancía",
   VENTA: "Se vendió",
@@ -132,4 +154,6 @@ export const TIPOS_MOVIMIENTO: Record<string, string> = {
   TRASLADO_SALIDA: "Se envió a otro local",
   TRASLADO_ENTRADA: "Llegó de otro local",
   AJUSTE_ARQUEO: "Corrección por arqueo",
+  RECLASIFICACION_SALIDA: "Se pasó a otro tipo de pieza",
+  RECLASIFICACION_ENTRADA: "Llegó de otro tipo de pieza",
 };

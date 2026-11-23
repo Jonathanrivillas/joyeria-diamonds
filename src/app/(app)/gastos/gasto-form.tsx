@@ -32,10 +32,13 @@ export function GastoForm({
   esAdmin,
   locales,
   localDefecto,
+  proveedores,
 }: {
   esAdmin: boolean;
   locales: { id: number; nombre: string }[];
   localDefecto?: number | null;
+  /** Proveedores activos, para "Pago a proveedor". */
+  proveedores: { id: number; nombre: string }[];
 }) {
   const [estado, accion, pendiente] = useActionState(registrarGasto, undefined);
   const [grupo, setGrupo] = useState<string>("");
@@ -47,6 +50,8 @@ export function GastoForm({
   const [errorArchivo, setErrorArchivo] = useState("");
   const [formKey, setFormKey] = useState(0);
   const [localGasto, setLocalGasto] = useState<number | null>(localDefecto ?? null);
+  const [proveedorId, setProveedorId] = useState<number | null>(null);
+  const esPagoProveedor = tipo === "PROVEEDOR";
 
   // El local es el paso 1 solo si hay de dónde escoger; los demás pasos se numeran después.
   const conLocal = esAdmin && locales.length > 1;
@@ -60,11 +65,12 @@ export function GastoForm({
       setJustificacion("");
       setArchivo("");
       setErrorArchivo("");
+      setProveedorId(null);
       setFormKey((k) => k + 1);
     }
   }, [estado]);
 
-  const listo = tipo && monto > 0 && justificacion.trim().length >= 5;
+  const listo = tipo && (!esPagoProveedor || proveedorId) && monto > 0 && justificacion.trim().length >= 5;
 
   async function alEscogerArchivo(e: React.ChangeEvent<HTMLInputElement>) {
     const input = e.currentTarget;
@@ -104,6 +110,8 @@ export function GastoForm({
     ? "Escoja el tipo de gasto"
     : !tipo
       ? "Escoja cuál gasto del presupuesto"
+      : esPagoProveedor && !proveedorId
+        ? "Escoja a cuál proveedor"
     : monto <= 0
       ? "Escriba cuánto costó"
       : justificacion.trim().length < 5
@@ -157,6 +165,25 @@ export function GastoForm({
                 </Chip>
               ))}
             </ChipGroup>
+          </Field>
+        )}
+
+        {esPagoProveedor && (
+          <Field label="¿A cuál proveedor se le pagó?">
+            <input type="hidden" name="proveedorId" value={proveedorId ?? ""} />
+            {proveedores.length === 0 ? (
+              <Alert tone="warning">
+                Todavía no hay proveedores. {esAdmin ? "Agréguelos en el módulo Proveedores." : "Pídale al administrador que los agregue."}
+              </Alert>
+            ) : (
+              <ChipGroup>
+                {proveedores.map((p) => (
+                  <Chip key={p.id} selected={proveedorId === p.id} onClick={() => setProveedorId(p.id)}>
+                    {p.nombre}
+                  </Chip>
+                ))}
+              </ChipGroup>
+            )}
           </Field>
         )}
 

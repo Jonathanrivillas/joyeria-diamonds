@@ -14,6 +14,7 @@ export function PageHeader({
   back,
   actions,
   eyebrow,
+  center,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -25,6 +26,8 @@ export function PageHeader({
   actions?: React.ReactNode;
   /** Texto pequeño encima del título (ej. la fecha). */
   eyebrow?: React.ReactNode;
+  /** Contenido centrado: en su propia línea arriba; en pantallas muy anchas, entre el título y los botones. */
+  center?: React.ReactNode;
 }) {
   return (
     <header className="mb-6">
@@ -39,6 +42,12 @@ export function PageHeader({
           <h1 className="text-2xl font-bold text-neutral-900 sm:text-[1.75rem]">{title}</h1>
           {subtitle && <p className="mt-0.5 text-base text-neutral-600">{subtitle}</p>}
         </div>
+        {/* Va sola en su línea, arriba y centrada; solo en pantallas muy anchas cabe entre el título y los botones. */}
+        {center && (
+          <div className="order-first w-full text-center 2xl:order-none 2xl:w-auto 2xl:flex-1 2xl:self-center 2xl:whitespace-nowrap">
+            {center}
+          </div>
+        )}
         {actions && <div className="no-print flex flex-wrap items-center gap-3">{actions}</div>}
       </div>
       {help && <p className="no-print mt-2 max-w-3xl text-base text-neutral-600">{help}</p>}

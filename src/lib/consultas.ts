@@ -5,6 +5,8 @@ export type FilaPlanilla = {
   categoriaId: number;
   nombre: string;
   controlaPeso: boolean;
+  /** Joyas preciosas: su detalle está en /inventario/joyas. */
+  porPieza: boolean;
   entradaPeso: number;
   entradaCant: number;
   salidaPeso: number;
@@ -45,6 +47,7 @@ export async function planillaDelDia(localId: number | null, dia: Date): Promise
       categoriaId: c.id,
       nombre: c.nombre,
       controlaPeso: c.controlaPeso,
+      porPieza: c.porPieza,
       entradaPeso: 0,
       entradaCant: 0,
       salidaPeso: 0,

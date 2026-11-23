@@ -9,7 +9,8 @@ export default async function TrasladosPage() {
   await requireAdmin();
   const [locales, categorias, traslados] = await Promise.all([
     db.local.findMany({ orderBy: { id: "asc" } }),
-    db.categoria.findMany({ where: { activa: true, esServicio: false }, orderBy: { orden: "asc" } }),
+    // Las joyas preciosas se mueven una por una desde Inventario → Joyas preciosas.
+    db.categoria.findMany({ where: { activa: true, esServicio: false, porPieza: false }, orderBy: { orden: "asc" } }),
     db.traslado.findMany({
       orderBy: { fecha: "desc" },
       take: 50,

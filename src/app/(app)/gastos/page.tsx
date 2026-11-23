@@ -34,11 +34,14 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
   const desde = sp.desde ? parseFechaISO(sp.desde) : hoy;
   const hasta = sp.hasta ? parseFechaISO(sp.hasta) : hoy;
 
-  const gastos = await db.gasto.findMany({
-    where: { ...(localId ? { localId } : {}), fecha: { gte: inicioDia(desde), lte: finDia(hasta) } },
-    orderBy: { fecha: "desc" },
-    include: { local: true, usuario: true },
-  });
+  const [gastos, proveedores] = await Promise.all([
+    db.gasto.findMany({
+      where: { ...(localId ? { localId } : {}), fecha: { gte: inicioDia(desde), lte: finDia(hasta) } },
+      orderBy: { fecha: "desc" },
+      include: { local: true, usuario: true, proveedor: true },
+    }),
+    db.proveedor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+  ]);
   const activos = gastos.filter((g) => g.estado === "ACTIVO");
   const total = activos.reduce((a, g) => a + g.monto, 0);
   const sumar = (tipos: string[]) => activos.filter((g) => tipos.includes(g.tipo)).reduce((a, g) => a + g.monto, 0);
@@ -61,7 +64,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
       <PageHeader title="Gastos" help="Anote aquí todo lo que se paga con la plata del local, con la explicación de en qué se gastó." />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
-        <GastoForm esAdmin={s.rol === "ADMIN"} locales={locales} localDefecto={localId ?? locales[0]?.id} />
+        <GastoForm esAdmin={s.rol === "ADMIN"} locales={locales} localDefecto={localId ?? locales[0]?.id} proveedores={proveedores} />
 
         <Section title="Gastos anotados">
           <RangoFechas ruta="/gastos" rangos={rangos} activo={activo} desde={aISO(desde)} hasta={aISO(hasta)} max={aISO(hoy)} />
@@ -113,7 +116,9 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
                       muted={anulado}
                       leading={<IconBadge icon={iconoGasto(g.tipo)} tone="neutral" size="sm" />}
                       title={<span className="whitespace-normal">{g.justificacion}</span>}
-                      meta={[TIPOS_GASTO[g.tipo] ?? g.tipo, cuando(g.fecha), g.usuario.nombre, !localId && g.local.nombre].filter(Boolean).join(" · ")}
+                      meta={[
+                        g.proveedor ? `${TIPOS_GASTO[g.tipo] ?? g.tipo}: ${g.proveedor.nombre}` : TIPOS_GASTO[g.tipo] ?? g.tipo,
+                        cuando(g.fecha), g.usuario.nombre, !localId && g.local.nombre].filter(Boolean).join(" · ")}
                       end={
                         <div className="flex items-center gap-3">
                           <p className={cn("text-xl font-bold tabular-nums", anulado && "text-neutral-500 line-through")}>{cop(g.monto)}</p>

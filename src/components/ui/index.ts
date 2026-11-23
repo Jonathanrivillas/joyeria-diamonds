@@ -10,6 +10,7 @@ export type { Tone } from "./tones";
 // Acciones
 export { Button, buttonClasses, type ButtonProps, type ButtonVariant, type ButtonSize } from "./button";
 export { ConfirmButton } from "./confirm-button";
+export { SubmitButton } from "./submit-button";
 export { PrintButton } from "./print-button";
 
 // Íconos

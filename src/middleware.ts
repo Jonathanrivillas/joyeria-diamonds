@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_SESION, verificarSesion } from "@/lib/token";
 
-const SOLO_ADMIN = ["/admin", "/inventario/entradas", "/traslados"];
+const SOLO_ADMIN = ["/admin", "/inventario/entradas", "/traslados", "/proveedores"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
