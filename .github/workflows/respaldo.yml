@@ -39,7 +39,7 @@ jobs:
           echo "FECHA=$FECHA" >> "$GITHUB_ENV"
 
       - name: Guardar la copia cifrada (30 días)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: respaldo-${{ env.FECHA }}
           path: respaldo-*.dump.gpg
