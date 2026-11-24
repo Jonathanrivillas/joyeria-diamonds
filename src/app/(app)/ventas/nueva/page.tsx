@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { precioDelDia } from "@/lib/precio";
 import { PageContainer } from "@/components/ui";
 import { VentaForm } from "./venta-form";
@@ -8,7 +8,7 @@ import { letraBonita, FRASE_NEGOCIO } from "@/lib/fuentes";
 export default async function NuevaVentaPage({ searchParams }: { searchParams: Promise<{ fe?: string }> }) {
   // ?fe=1 → venta con factura electrónica (se envía a Alegra). Sin él, la venta de siempre.
   const facturaElectronica = (await searchParams).fe === "1";
-  const s = await requireSesion();
+  const s = await requirePermiso("vender");
   const { localId, locales } = await getAlcance(s);
   const [categorias, existencias, precio, proveedores, joyas] = await Promise.all([
     db.categoria.findMany({ where: { activa: true }, orderBy: { orden: "asc" } }),
@@ -31,6 +31,7 @@ export default async function NuevaVentaPage({ searchParams }: { searchParams: P
         facturaElectronica={facturaElectronica}
         proveedores={proveedores}
         joyas={joyas}
+        precioGramo={precio.valor}
         frase={
           <p className={`${letraBonita.className} text-3xl leading-tight text-brand-700 sm:text-4xl`}>
             {FRASE_NEGOCIO}

@@ -75,7 +75,10 @@ export function VentaForm({
   facturaElectronica = false,
   proveedores = [],
   joyas = [],
+  precioGramo = 0,
 }: {
+  /** Precio del gramo de hoy, el que puso el administrador. */
+  precioGramo?: number;
   /** Joyas preciosas disponibles en todos los locales (se filtran por el local de la venta). */
   joyas?: Joya[];
   /** Proveedores activos: una transferencia puede llegar a la cuenta de uno de ellos. */
@@ -272,6 +275,7 @@ export function VentaForm({
     <div className="space-y-6">
       <PageHeader
         title={facturaE ? "Venta con factura electrónica" : "Vender"}
+        subtitle={precioGramo > 0 ? <>Precio del gramo hoy: <span className="font-bold text-neutral-900">{cop(precioGramo)}</span></> : undefined}
         center={frase}
         back={
           facturaE
@@ -504,9 +508,14 @@ export function VentaForm({
                     <p className="text-lg">
                       {cat.controlaPeso ? "Precio del gramo hoy" : "Precio por pieza"}: <span className="font-bold">{cop(precio)}</span>
                     </p>
-                    <Button variant="secondary" icon={Pencil} onClick={() => setCambiarPrecio(true)}>
-                      Cambiar precio
-                    </Button>
+                    {/* Solo el administrador cambia el precio; el vendedor vende al precio que él puso. */}
+                    {esAdmin ? (
+                      <Button variant="secondary" icon={Pencil} onClick={() => setCambiarPrecio(true)}>
+                        Cambiar precio
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-neutral-500">Lo pone el administrador</span>
+                    )}
                   </div>
                 ) : (
                   <MoneyInput

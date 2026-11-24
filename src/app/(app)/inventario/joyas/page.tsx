@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeftRight, Gem, Pencil, Save } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { cop, gramos, fechaHora, plural } from "@/lib/format";
 import { asegurarCategoriaJoyas, TIPOS_JOYA } from "@/lib/joyas";
 import {
@@ -30,7 +30,7 @@ export default async function JoyasPage({
   searchParams: Promise<{ ver?: string; buscar?: string; ok?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("inventario");
   const esAdmin = s.rol === "ADMIN";
   const { localId, locales } = await getAlcance(s);
   const cat = await asegurarCategoriaJoyas();

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
+import { puedeVer } from "@/lib/permisos";
 import { resumenRango } from "@/lib/consultas";
 import { finDia, inicioDia } from "@/lib/fechas";
 import { cop, cuando, gramos, entero, fechaLarga, plural, saludo } from "@/lib/format";
@@ -26,7 +27,7 @@ function Acceso({ href, titulo, texto, icon }: { href: string; titulo: string; t
 }
 
 export default async function InicioPage() {
-  const s = await requireSesion();
+  const s = await requirePermiso("inicio");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const whereLocal = localId ? { localId } : {};
@@ -68,9 +69,11 @@ export default async function InicioPage() {
           </p>
         }
         actions={
-          <Button href={MODULOS.vender.href} size="lg" icon={MODULOS.vender.icon}>
-            Nueva venta
-          </Button>
+          puedeVer(s, "vender") && (
+            <Button href={MODULOS.vender.href} size="lg" icon={MODULOS.vender.icon}>
+              Nueva venta
+            </Button>
+          )
         }
       />
 
@@ -103,14 +106,16 @@ export default async function InicioPage() {
 
       <Section title="Accesos rápidos">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <Acceso href={MODULOS.gastos.href} titulo="Anotar un gasto" texto="En qué se gastó plata" icon={MODULOS.gastos.icon} />
-          <Acceso href={MODULOS.arqueo.href} titulo="Hacer el arqueo" texto="Contar la mercancía" icon={MODULOS.arqueo.icon} />
+          {puedeVer(s, "gastos") && <Acceso href={MODULOS.gastos.href} titulo="Anotar un gasto" texto="En qué se gastó plata" icon={MODULOS.gastos.icon} />}
+          {puedeVer(s, "arqueo") && <Acceso href={MODULOS.arqueo.href} titulo="Hacer el arqueo" texto="Contar la mercancía" icon={MODULOS.arqueo.icon} />}
+          {puedeVer(s, "inventario") && (
           <Acceso
             href={MODULOS.inventario.href}
             titulo="Ver inventario"
             texto={`${gramos(stock._sum.pesoCg ?? 0)} · ${entero(stock._sum.cantidad ?? 0)} piezas`}
             icon={MODULOS.inventario.icon}
           />
+          )}
         </div>
       </Section>
 
@@ -119,9 +124,11 @@ export default async function InicioPage() {
           <CardHeader
             title="Ventas de hoy"
             action={
-              <Button variant="link" href={MODULOS.facturas.href}>
-                Ver todas las facturas
-              </Button>
+              puedeVer(s, "facturas") && (
+                <Button variant="link" href={MODULOS.facturas.href}>
+                  Ver todas las facturas
+                </Button>
+              )
             }
           />
           <List>

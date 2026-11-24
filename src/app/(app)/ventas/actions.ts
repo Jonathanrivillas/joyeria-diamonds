@@ -4,7 +4,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireSesion, localParaOperar } from "@/lib/session";
+import { requireSesion, exigirPermiso, localParaOperar } from "@/lib/session";
+import { puedeVer } from "@/lib/permisos";
+import { precioDelDia } from "@/lib/precio";
 import { registrarMovimiento, siguienteNumeroFactura } from "@/lib/inventario";
 import { auditar } from "@/lib/auditoria";
 import { facturarVenta } from "@/lib/factura-electronica";
@@ -38,6 +40,7 @@ export type NuevaVentaInput = z.infer<typeof VentaSchema>;
 
 export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: string; id?: number }> {
   const s = await requireSesion();
+  if (!puedeVer(s, "vender")) return { error: "No tiene permiso para vender. Pídaselo al administrador." };
   const parsed = VentaSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   const v = parsed.data;
@@ -66,6 +69,18 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
 
   const categorias = await db.categoria.findMany({ where: { id: { in: v.items.map((i) => i.categoriaId) } } });
   const catMap = new Map(categorias.map((c) => [c.id, c]));
+
+  // El vendedor vende al precio que puso el administrador: aquí se impone, sin importar lo que mande la pantalla.
+  if (s.rol !== "ADMIN") {
+    const oficial = (await precioDelDia()).valor;
+    for (const i of v.items) {
+      const c = catMap.get(i.categoriaId);
+      if (!c || c.esServicio || c.porPieza) continue; // trabajos: el valor que se cobra; joyas: su propio precio
+      i.precioGramo = c.controlaPeso ? oficial : c.precioUnidadSugerido;
+      i.hechura = 0;
+      if (i.precioGramo <= 0) return { error: "El administrador todavía no ha puesto el precio del gramo de hoy." };
+    }
+  }
 
   // Joyas preciosas: peso y precio salen de la joya guardada, no de lo que mande la pantalla.
   const piezaIds = v.items.map((i) => i.piezaId).filter((id): id is number => !!id);
@@ -221,7 +236,7 @@ export async function anularVenta(form: FormData) {
 
 /** Vuelve a enviar a Alegra una venta cuya factura electrónica quedó pendiente o con error. */
 export async function reintentarFactura(form: FormData) {
-  const s = await requireSesion();
+  const s = await exigirPermiso("vender", "facturas");
   const id = Number(form.get("id"));
   const venta = await db.venta.findUnique({ where: { id }, select: { localId: true } });
   if (!venta || (s.rol !== "ADMIN" && venta.localId !== s.localId)) throw new Error("La venta no existe");

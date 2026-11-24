@@ -1,6 +1,6 @@
 import { ChevronRight, ClipboardCheck } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, inicioDia, sumarDias } from "@/lib/fechas";
 import { fechaLarga, hora } from "@/lib/format";
 import { Button, Card, Chip, ChipGroup, EmptyState, List, ListItem, PageContainer, PageHeader, Section } from "@/components/ui";
@@ -10,7 +10,7 @@ import { iniciarArqueo } from "./actions";
 export default async function ArqueoPage({ searchParams }: { searchParams: Promise<{ dif?: string }> }) {
   const sp = await searchParams;
   const soloDiferencia = sp.dif === "1";
-  const s = await requireSesion();
+  const s = await requirePermiso("arqueo");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const localesVista = localId ? locales.filter((l) => l.id === localId) : locales;

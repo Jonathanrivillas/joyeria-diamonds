@@ -1,6 +1,6 @@
 import { Paperclip, Ban, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
 import { cop, cuando, plural, TIPOS_GASTO } from "@/lib/format";
 import { rangoActivo, rangosRapidos } from "@/lib/rangos";
@@ -28,7 +28,7 @@ import { anularGasto } from "./actions";
 
 export default async function GastosPage({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("gastos");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const desde = sp.desde ? parseFechaISO(sp.desde) : hoy;

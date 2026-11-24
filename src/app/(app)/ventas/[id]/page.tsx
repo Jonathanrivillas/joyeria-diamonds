@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Home, ShoppingBag, Ban, RotateCw, FileCheck } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion } from "@/lib/session";
+import { requirePermiso } from "@/lib/session";
 import { cop, gramos, fechaHora, METODOS_PAGO, canalVenta } from "@/lib/format";
 import {
   Alert,
@@ -34,7 +34,7 @@ export default async function VentaDetallePage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("vender", "facturas");
   const v = await db.venta.findUnique({
     where: { id: Number(id) },
     include: { local: true, usuario: true, proveedor: true, items: { include: { categoria: true } } },

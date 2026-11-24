@@ -14,7 +14,8 @@ export type PrecioDelDia = {
 
 /**
  * Precio del gramo vigente: el último registrado. Todas las piezas se venden
- * a este precio (la vendedora puede cambiarlo solo para una venta).
+ * a este precio. Solo el administrador puede cambiarlo para una venta (ej. un descuento);
+ * a los vendedores el servidor les impone este precio.
  */
 export async function precioDelDia(): Promise<PrecioDelDia> {
   const ultimo = await db.precioGramo.findFirst({

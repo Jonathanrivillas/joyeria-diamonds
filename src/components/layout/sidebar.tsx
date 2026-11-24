@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button, Icon, Logo, LogoNombre, cn } from "@/components/ui";
-import { OTROS, PRINCIPALES, esActivo, type Modulo } from "./navegacion";
+import { OTROS, PRINCIPALES, esActivo, moduloVisible, type Modulo } from "./navegacion";
 
 function Enlace({ m, activo }: { m: Modulo; activo: boolean }) {
   return (
@@ -40,20 +40,26 @@ export function Marca() {
   );
 }
 
-export function Sidebar({ rol }: { rol: string }) {
+export function Sidebar({ rol, permisos }: { rol: string; permisos: string[] }) {
   const path = usePathname();
   const [abierto, setAbierto] = useState(false);
   useEffect(() => setAbierto(false), [path]);
-  const otros = OTROS.filter((m) => !m.admin || rol === "ADMIN");
+  // Solo lo que el usuario puede ver: el vendedor, según los permisos que le dio el administrador.
+  const principales = PRINCIPALES.filter((m) => moduloVisible(m, rol, permisos));
+  const otros = OTROS.filter((m) => moduloVisible(m, rol, permisos));
+  // Barra inferior del celular: hasta 4 accesos directos + el botón Menú.
+  const barra = [...principales, ...otros].slice(0, 4);
 
   const contenido = (
     <>
       <Marca />
       <nav className="sin-barra flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="Menú principal">
-        {PRINCIPALES.map((m) => (
+        {principales.map((m) => (
           <Enlace key={m.href} m={m} activo={esActivo(path, m.href)} />
         ))}
-        <p className="px-3 pb-1 pt-5 text-sm font-semibold uppercase tracking-wide text-neutral-500 [@media(max-height:760px)]:pt-3">Más opciones</p>
+        {otros.length > 0 && (
+          <p className="px-3 pb-1 pt-5 text-sm font-semibold uppercase tracking-wide text-neutral-500 [@media(max-height:760px)]:pt-3">Más opciones</p>
+        )}
         {otros.map((m) => (
           <Enlace key={m.href} m={m} activo={esActivo(path, m.href)} />
         ))}
@@ -71,9 +77,10 @@ export function Sidebar({ rol }: { rol: string }) {
       {/* Celular / tablet: barra inferior con lo principal + botón Menú */}
       <nav
         aria-label="Menú rápido"
-        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_rgba(0,0,0,0.06)] lg:hidden"
+        className="no-print fixed inset-x-0 bottom-0 z-30 grid border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_rgba(0,0,0,0.06)] lg:hidden"
+        style={{ gridTemplateColumns: `repeat(${barra.length + 1}, minmax(0, 1fr))` }}
       >
-        {PRINCIPALES.slice(0, 4).map((m) => {
+        {barra.map((m) => {
           const activo = esActivo(path, m.href);
           return (
             <Link key={m.href} href={m.href} aria-current={activo ? "page" : undefined} className={cn(pestana, activo ? "text-brand-800" : "text-neutral-600")}>

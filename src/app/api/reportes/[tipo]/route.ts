@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSesion, getAlcance } from "@/lib/session";
 import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
 import { TIPOS_GASTO, canalVenta } from "@/lib/format";
+import { puedeVer } from "@/lib/permisos";
 
 function csv(filas: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
@@ -24,6 +25,7 @@ export async function GET(
   const { tipo } = await params;
   const s = await getSesion();
   if (!s || s.debeCambiarClave) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!puedeVer(s, "reportes")) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const { localId } = await getAlcance(s);
   const whereLocal = localId ? { localId } : {};
   const desde = inicioDia(parseFechaISO(req.nextUrl.searchParams.get("desde")));

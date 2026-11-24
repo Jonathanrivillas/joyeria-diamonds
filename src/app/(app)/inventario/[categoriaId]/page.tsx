@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { History } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { gramos, entero, fechaHora, TIPOS_MOVIMIENTO } from "@/lib/format";
 import { Card, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr, cn } from "@/components/ui";
 
@@ -17,7 +17,7 @@ function Cambio({ valor, texto }: { valor: number; texto: string }) {
 
 export default async function KardexPage({ params }: { params: Promise<{ categoriaId: string }> }) {
   const { categoriaId } = await params;
-  const s = await requireSesion();
+  const s = await requirePermiso("inventario");
   const { localId } = await getAlcance(s);
   const cat = await db.categoria.findUnique({ where: { id: Number(categoriaId) } });
   if (!cat) notFound();

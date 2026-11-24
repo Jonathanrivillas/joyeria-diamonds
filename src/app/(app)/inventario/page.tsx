@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Gem, PackagePlus, ChevronRight } from "lucide-react";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { planillaDelDia } from "@/lib/consultas";
 import { aISO, inicioDia, parseFechaISO } from "@/lib/fechas";
 import { gramos, entero, plural } from "@/lib/format";
@@ -15,7 +15,7 @@ const TOTAL = "border-t-2 border-t-neutral-500 border-b-0 py-4";
 
 export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ fecha?: string }> }) {
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("inventario");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const dia = parseFechaISO(sp.fecha);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSesion } from "@/lib/session";
+import { puedeVer } from "@/lib/permisos";
 
 const noEncontrado = () => new NextResponse("No encontrado", { status: 404 });
 
@@ -12,6 +13,7 @@ export async function GET(
   const s = await getSesion();
   if (!s || s.debeCambiarClave)
     return new NextResponse("No autorizado", { status: 401 });
+  if (!puedeVer(s, "gastos")) return noEncontrado();
 
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return noEncontrado();

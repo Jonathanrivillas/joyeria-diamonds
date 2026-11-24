@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BarChart3, Download } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { resumenRango } from "@/lib/consultas";
 import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
 import { cop, gramos, fecha, fechaLarga, METODOS_PAGO, REDES, TIPOS_GASTO, plural } from "@/lib/format";
@@ -27,7 +27,7 @@ import { GraficoCategorias, GraficoVentasGastos } from "@/components/graficos/gr
 
 export default async function ReportesPage({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("reportes");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const desde = inicioDia(parseFechaISO(sp.desde));

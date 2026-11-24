@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireSesion, localParaOperar } from "@/lib/session";
+import { requireSesion, exigirPermiso, localParaOperar } from "@/lib/session";
+import { puedeVer } from "@/lib/permisos";
+
+const SIN_PERMISO_ARQUEO = "No tiene permiso para hacer arqueos. Pídaselo al administrador.";
 import { registrarMovimiento } from "@/lib/inventario";
 import { auditar } from "@/lib/auditoria";
 import { z } from "zod";
@@ -22,7 +25,7 @@ function estadoDe(
 
 /** Abre el arqueo del día tomando una foto del saldo del sistema. */
 export async function iniciarArqueo(form: FormData) {
-  const s = await requireSesion();
+  const s = await exigirPermiso("arqueo");
   const localId = localParaOperar(s, Number(form.get("localId")) || null);
 
   const abierto = await db.arqueo.findFirst({
@@ -123,6 +126,7 @@ export async function guardarConteo(
   input: ConteoInput,
 ): Promise<{ error?: string; ok?: string }> {
   const s = await requireSesion();
+  if (!puedeVer(s, "arqueo")) return { error: SIN_PERMISO_ARQUEO };
   const r = ConteoSchema.safeParse(input);
   if (!r.success) return { error: ERROR_CONTEO };
   input = r.data;
@@ -140,6 +144,7 @@ export async function cerrarArqueo(
   aplicarAjustes: boolean,
 ): Promise<{ error?: string }> {
   const s = await requireSesion();
+  if (!puedeVer(s, "arqueo")) return { error: SIN_PERMISO_ARQUEO };
   const r = ConteoSchema.safeParse(input);
   if (!r.success) return { error: ERROR_CONTEO };
   input = r.data;

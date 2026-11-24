@@ -37,6 +37,8 @@ model Usuario {
   activo           Boolean       @default(true)
   sesionVersion    Int           @default(0)
   debeCambiarClave Boolean       @default(false)
+  // Pantallas que puede ver un VENDEDOR (ver src/lib/permisos.ts). El ADMIN ve todo.
+  permisos         String[]      @default(["vender", "facturas"])
   localId          Int?
   local            Local?        @relation(fields: [localId], references: [id])
   movimientos      Movimiento[]

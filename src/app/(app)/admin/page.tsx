@@ -1,11 +1,15 @@
-import { History, Plus, Save, UserPlus } from "lucide-react";
+import { History, Plus, Save, ShieldCheck, UserPlus } from "lucide-react";
+import { PERMISOS, PERMISOS_DEFECTO } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { esSoporte, requireAdmin } from "@/lib/session";
 import {
+  Alert,
   Button,
   Card,
   CardHeader,
   Checkbox,
+  Disclosure,
+  Icon,
   Input,
   PageContainer,
   PageHeader,
@@ -13,15 +17,29 @@ import {
   Section,
   Select,
   StatusBadge,
+  SubmitButton,
 } from "@/components/ui";
 import {
   alternarUsuario,
   crearUsuario,
+  guardarPermisos,
   guardarCategoria,
   guardarLocal,
 } from "./actions";
 
-export default async function AdminPage() {
+/** Una casilla por pantalla. El formulario manda todas las marcadas con el nombre "permisos". */
+function CasillasPermisos({ marcados }: { marcados: string[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {PERMISOS.map((p) => (
+        <Checkbox key={p.clave} variant="card" name="permisos" value={p.clave} label={p.nombre} description={p.detalle} defaultChecked={marcados.includes(p.clave)} />
+      ))}
+    </div>
+  );
+}
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  const sp = await searchParams;
   const s = await requireAdmin();
   const soporte = esSoporte(s);
   const [categorias, locales, usuarios] = await Promise.all([
@@ -138,6 +156,10 @@ export default async function AdminPage() {
         </>
       )}
 
+      <div id="usuarios" className="scroll-mt-24 space-y-3">
+        {sp.ok && <Alert tone="success">{sp.ok}</Alert>}
+        {sp.error && <Alert tone="danger">{sp.error}</Alert>}
+      </div>
       <Section title="Usuarios">
         {/* Lista (no tabla) para que se acomode a cualquier ancho sin desplazarse de lado. */}
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -157,6 +179,13 @@ export default async function AdminPage() {
                       {u.rol === "ADMIN" ? "Administrador" : "Vendedor"} ·{" "}
                       {u.local?.nombre ?? "Todos los locales"}
                     </p>
+                    <p className="text-sm text-neutral-500">
+                      {u.rol === "ADMIN"
+                        ? "Ve todo"
+                        : u.permisos.length
+                          ? `Ve: ${PERMISOS.filter((p) => u.permisos.includes(p.clave)).map((p) => p.nombre).join(", ")}`
+                          : "No tiene pantallas asignadas"}
+                    </p>
                   </div>
                   <StatusBadge status={u.activo ? "HABILITADO" : "INACTIVO"} />
                   {u.id !== s.id && (
@@ -170,6 +199,17 @@ export default async function AdminPage() {
                         {u.activo ? "Desactivar" : "Activar"}
                       </Button>
                     </form>
+                  )}
+                  {u.rol !== "ADMIN" && (
+                    <Disclosure title="Qué pantallas puede ver" icon={ShieldCheck} className="basis-full">
+                      <form action={guardarPermisos} className="space-y-3">
+                        <input type="hidden" name="id" value={u.id} />
+                        <CasillasPermisos marcados={u.permisos} />
+                        <SubmitButton loadingText="Guardando...">
+                          <Icon icon={Save} /> Guardar permisos
+                        </SubmitButton>
+                      </form>
+                    </Disclosure>
                   )}
                 </li>
               ))}
@@ -211,9 +251,13 @@ export default async function AdminPage() {
                   }))}
                 />
               </div>
-              <Button type="submit" block icon={UserPlus}>
-                Crear
-              </Button>
+              <fieldset className="space-y-2">
+                <legend className="text-base font-semibold">Qué pantallas puede ver (solo vendedores)</legend>
+                <CasillasPermisos marcados={PERMISOS_DEFECTO} />
+              </fieldset>
+              <SubmitButton block loadingText="Creando...">
+                <Icon icon={UserPlus} /> Crear
+              </SubmitButton>
             </form>
           </Card>
         </div>

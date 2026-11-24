@@ -8,11 +8,13 @@ import { db } from "@/lib/db";
 import { requireSesion, requireAdmin, localParaOperar } from "@/lib/session";
 import { parseCOP, TIPOS_GASTO } from "@/lib/format";
 import { auditar } from "@/lib/auditoria";
+import { puedeVer } from "@/lib/permisos";
 
 export type EstadoGasto = { error?: string; ok?: string } | undefined;
 
 export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promise<EstadoGasto> {
   const s = await requireSesion();
+  if (!puedeVer(s, "gastos")) return { error: "No tiene permiso para anotar gastos. Pídaselo al administrador." };
   let localId: number;
   try {
     localId = localParaOperar(s, Number(form.get("localId")) || null);

@@ -1,6 +1,6 @@
 import { ShoppingBag, SlidersHorizontal, Search, Receipt } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSesion, getAlcance } from "@/lib/session";
+import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
 import { cop, fecha, fechaLarga, gramos, METODOS_PAGO, plural } from "@/lib/format";
 import { rangoActivo, rangosRapidos } from "@/lib/rangos";
@@ -34,7 +34,7 @@ export default async function VentasPage({
   searchParams: Promise<{ desde?: string; hasta?: string; metodo?: string; vendedor?: string; q?: string; estado?: string }>;
 }) {
   const sp = await searchParams;
-  const s = await requireSesion();
+  const s = await requirePermiso("facturas");
   const { localId } = await getAlcance(s);
   const hoy = inicioDia(new Date());
   const desde = sp.desde ? parseFechaISO(sp.desde) : hoy;

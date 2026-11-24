@@ -11,6 +11,8 @@ export type Sesion = {
   localId: number | null;
   version: number;
   debeCambiarClave?: boolean;
+  /** Se lee de la base en cada petición (no va en el token): un cambio aplica de inmediato. */
+  permisos?: string[];
 };
 
 function clave() {

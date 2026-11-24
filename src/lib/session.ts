@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { COOKIE_SESION, verificarSesion, type Sesion } from "./token";
 import { db } from "./db";
+import { paginaInicial, puedeVer, type Permiso } from "./permisos";
 
 export const COOKIE_LOCAL = "joyeria_local";
 
@@ -17,7 +18,7 @@ export const getSesion = cache(async (): Promise<Sesion | null> => {
   if (!t) return null;
   const u = await db.usuario.findUnique({
     where: { id: t.id },
-    select: { id: true, nombre: true, email: true, rol: true, localId: true, activo: true, sesionVersion: true, debeCambiarClave: true },
+    select: { id: true, nombre: true, email: true, rol: true, localId: true, activo: true, sesionVersion: true, debeCambiarClave: true, permisos: true },
   });
   if (!u || !u.activo || u.sesionVersion !== t.version) return null;
   return {
@@ -28,6 +29,7 @@ export const getSesion = cache(async (): Promise<Sesion | null> => {
     localId: u.localId,
     version: u.sesionVersion,
     debeCambiarClave: u.debeCambiarClave,
+    permisos: u.permisos,
   };
 });
 
@@ -35,6 +37,23 @@ export async function requireSesion(): Promise<Sesion> {
   const s = await getSesion();
   if (!s) redirect("/login?salir=1");
   if (s.debeCambiarClave) redirect("/cambiar-clave");
+  return s;
+}
+
+/**
+ * Exige permiso para una pantalla (el ADMIN siempre lo tiene). Con varios, basta uno.
+ * Si no lo tiene, lo manda a la primera pantalla que sí puede ver.
+ */
+export async function requirePermiso(...permisos: Permiso[]): Promise<Sesion> {
+  const s = await requireSesion();
+  if (!permisos.some((p) => puedeVer(s, p))) redirect(paginaInicial(s));
+  return s;
+}
+
+/** Para acciones del servidor: en vez de redirigir, lanza un error (no se guarda nada). */
+export async function exigirPermiso(...permisos: Permiso[]): Promise<Sesion> {
+  const s = await requireSesion();
+  if (!permisos.some((p) => puedeVer(s, p))) throw new Error("No tiene permiso para hacer esto. Pídaselo al administrador.");
   return s;
 }
 
