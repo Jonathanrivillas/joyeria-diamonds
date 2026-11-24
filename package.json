@@ -10,6 +10,8 @@
     "db:seed": "prisma db seed",
     "setup": "prisma migrate deploy && prisma db seed",
     "verificar": "tsx scripts/verificar.ts",
+    "datos:prueba": "tsx --env-file=.env scripts/datos.ts --prueba --si",
+    "datos:cero": "tsx --env-file=.env scripts/datos.ts --cero --si",
     "postinstall": "prisma generate",
     "vercel-build": "prisma migrate deploy && next build"
   },
