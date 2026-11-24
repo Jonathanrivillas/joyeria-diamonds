@@ -39,6 +39,8 @@ model Usuario {
   debeCambiarClave Boolean       @default(false)
   // Pantallas que puede ver un VENDEDOR (ver src/lib/permisos.ts). El ADMIN ve todo.
   permisos         String[]      @default(["vender", "facturas"])
+  // Tamaño de letra que escogió la persona en "Mi cuenta": NORMAL | GRANDE | MUY_GRANDE
+  letra            String        @default("NORMAL")
   localId          Int?
   local            Local?        @relation(fields: [localId], references: [id])
   movimientos      Movimiento[]

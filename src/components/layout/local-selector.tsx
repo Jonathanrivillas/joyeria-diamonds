@@ -33,9 +33,9 @@ export function LocalSelector({
 
   if (!esAdmin) {
     return (
-      <div className="flex items-center gap-2 text-lg font-semibold">
-        <Icon icon={Store} size="md" className="text-brand-700" />
-        {locales[0]?.nombre ?? "Sin local"}
+      <div className="flex min-w-0 items-center gap-2 text-lg font-semibold">
+        <Icon icon={Store} size="md" className="shrink-0 text-brand-700" />
+        <span className="truncate">{locales[0]?.nombre ?? "Sin local"}</span>
       </div>
     );
   }

@@ -87,7 +87,8 @@ export function Sidebar({ rol, permisos }: { rol: string; permisos: string[] }) 
               <span className={cn("rounded-full px-4 py-1", activo && "bg-brand-100")}>
                 <Icon icon={m.icon} size="md" />
               </span>
-              {m.label}
+              {/* Nombre corto y en una línea: con letra grande no se parte en dos. */}
+              <span className="max-w-full truncate px-1">{m.corto ?? m.label}</span>
             </Link>
           );
         })}

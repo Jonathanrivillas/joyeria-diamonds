@@ -13,6 +13,8 @@ export type Sesion = {
   debeCambiarClave?: boolean;
   /** Se lee de la base en cada petición (no va en el token): un cambio aplica de inmediato. */
   permisos?: string[];
+  /** Tamaño de letra de la persona (NORMAL | GRANDE | MUY_GRANDE). También se lee de la base. */
+  letra?: string;
 };
 
 function clave() {

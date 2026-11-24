@@ -76,7 +76,10 @@ export function VentaForm({
   proveedores = [],
   joyas = [],
   precioGramo = 0,
+  pesoInicial,
 }: {
+  /** Peso que viene de la calculadora "¿Cuánto vale?" (texto, ej. "3,25"). */
+  pesoInicial?: string;
   /** Precio del gramo de hoy, el que puso el administrador. */
   precioGramo?: number;
   /** Joyas preciosas disponibles en todos los locales (se filtran por el local de la venta). */
@@ -102,6 +105,8 @@ export function VentaForm({
   // Pieza en edición
   const [catId, setCatId] = useState<number | null>(null);
   const [peso, setPeso] = useState("");
+  // Peso que llega de la calculadora "¿Cuánto vale?": se pone en la primera pieza que pese.
+  const [pesoPendiente, setPesoPendiente] = useState(pesoInicial ?? "");
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState(0);
   const [cambiarPrecio, setCambiarPrecio] = useState(false);
@@ -157,7 +162,10 @@ export function VentaForm({
 
   function elegir(c: Cat) {
     setCatId(c.id);
-    setPeso("");
+    // Si viene un peso de la calculadora y esta pieza se pesa, se usa (una sola vez).
+    const usaPeso = c.controlaPeso && !c.esServicio && !c.porPieza && !!pesoPendiente;
+    setPeso(usaPeso ? pesoPendiente : "");
+    if (usaPeso) setPesoPendiente("");
     setCantidad(1);
     setPrecio(c.precio);
     setCambiarPrecio(false);
@@ -320,6 +328,11 @@ export function VentaForm({
       {/* PASO 1: escoger el tipo de pieza */}
       {paso === "elegir" && (
         <div className="space-y-5">
+          {pesoPendiente && (
+            <Alert tone="info" title={`Peso de la calculadora: ${pesoPendiente} g`}>
+              Toque el tipo de pieza y el peso ya queda puesto.
+            </Alert>
+          )}
           <Section
             title="¿Qué va a vender?"
             description="Toque el tipo de pieza."

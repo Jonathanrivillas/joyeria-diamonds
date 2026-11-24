@@ -24,13 +24,14 @@ import {
   Tr,
 } from "@/components/ui";
 import { anularVenta, reintentarFactura } from "../actions";
+import { AutoImprimir } from "@/components/ventas/auto-imprimir";
 
 export default async function VentaDetallePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ nueva?: string; cambio?: string }>;
+  searchParams: Promise<{ nueva?: string; cambio?: string; imprimir?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -47,6 +48,7 @@ export default async function VentaDetallePage({
 
   return (
     <PageContainer width="md">
+      {sp.imprimir === "1" && <AutoImprimir />}
       <PageHeader
         title={`Factura ${v.numero}`}
         back={{ href: "/ventas", label: "Volver a las facturas" }}

@@ -18,7 +18,7 @@ export const getSesion = cache(async (): Promise<Sesion | null> => {
   if (!t) return null;
   const u = await db.usuario.findUnique({
     where: { id: t.id },
-    select: { id: true, nombre: true, email: true, rol: true, localId: true, activo: true, sesionVersion: true, debeCambiarClave: true, permisos: true },
+    select: { id: true, nombre: true, email: true, rol: true, localId: true, activo: true, sesionVersion: true, debeCambiarClave: true, permisos: true, letra: true },
   });
   if (!u || !u.activo || u.sesionVersion !== t.version) return null;
   return {
@@ -30,6 +30,7 @@ export const getSesion = cache(async (): Promise<Sesion | null> => {
     version: u.sesionVersion,
     debeCambiarClave: u.debeCambiarClave,
     permisos: u.permisos,
+    letra: u.letra,
   };
 });
 
