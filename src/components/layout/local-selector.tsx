@@ -23,10 +23,10 @@ export function LocalSelector({
   // En la venta, el local se escoge dentro del formulario: aquí solo se muestra.
   if (esAdmin && path === "/ventas/nueva") {
     return (
-      <div className="flex items-center gap-2 text-lg">
-        <Icon icon={Store} size="md" className="text-brand-700" />
-        <span className="text-neutral-600">Vendiendo en</span>
-        <span className="font-semibold">{localVenta ?? "…"}</span>
+      <div className="flex min-w-0 items-center gap-2 text-lg">
+        <Icon icon={Store} size="md" className="shrink-0 text-brand-700" />
+        <span className="hidden text-neutral-600 sm:inline">Vendiendo en</span>
+        <span className="truncate font-semibold">{localVenta ?? "…"}</span>
       </div>
     );
   }

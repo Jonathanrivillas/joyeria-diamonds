@@ -29,7 +29,7 @@ export function TrasladoForm({
 
   return (
     <Card padding="lg">
-      <form action={accion} className="space-y-5">
+      <form action={accion} className="space-y-5 [&>h2]:!mt-0">
         <h2 className="text-2xl font-bold">Mover mercancía</h2>
         {estado?.ok && <Alert tone="success">{estado.ok}</Alert>}
         <Select

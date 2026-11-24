@@ -36,11 +36,24 @@ export function RangoFechas({
     <ChipGroup>
       {rangos.map((r) => (
         <Chip key={r.etiqueta} href={`${ruta}?desde=${r.desde}&hasta=${r.hasta}${conservar ? `&${conservar}` : ""}`} selected={activo === r.etiqueta}>
-          {r.etiqueta}
+          <span className="sm:hidden">{r.corta}</span>
+          <span className="hidden sm:inline">{r.etiqueta}</span>
         </Chip>
       ))}
       {personalizado && (
-        <Popover label={activo ? "Otras fechas…" : etiquetaRango(desde, hasta)} icon={CalendarRange}>
+        <Popover
+          label={
+            activo ? (
+              <>
+                <span className="sm:hidden">Fechas</span>
+                <span className="hidden sm:inline">Otras fechas…</span>
+              </>
+            ) : (
+              etiquetaRango(desde, hasta)
+            )
+          }
+          icon={CalendarRange}
+        >
           <form action={ruta} className="space-y-4">
             <DatePicker name="desde" label="Desde" defaultValue={desde} max={max} />
             <DatePicker name="hasta" label="Hasta" defaultValue={hasta} max={max} />

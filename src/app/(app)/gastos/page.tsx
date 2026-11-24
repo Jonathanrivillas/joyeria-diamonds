@@ -1,4 +1,4 @@
-import { Paperclip, Ban, Wallet } from "lucide-react";
+import { Paperclip, Ban, History, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
@@ -66,7 +66,14 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
         <GastoForm esAdmin={s.rol === "ADMIN"} locales={locales} localDefecto={localId ?? locales[0]?.id} proveedores={proveedores} />
 
-        <Section title="Gastos anotados">
+        <Section
+          title="Gastos anotados"
+          action={
+            <Button href="/gastos/historial" variant="secondary" icon={History}>
+              Ver todos los gastos
+            </Button>
+          }
+        >
           <RangoFechas ruta="/gastos" rangos={rangos} activo={activo} desde={aISO(desde)} hasta={aISO(hasta)} max={aISO(hoy)} />
 
           <StatPanel columns={porTipo.length > 0 ? 2 : 1}>

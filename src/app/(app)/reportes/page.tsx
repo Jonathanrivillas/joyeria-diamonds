@@ -16,6 +16,8 @@ import {
   PageContainer,
   PageHeader,
   PrintButton,
+  Stat,
+  StatPanel,
   Table,
   Td,
   Th,
@@ -259,11 +261,11 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
       <Card>
         <CardHeader title="Ganancia" description="Lo que se vendió menos lo que costó comprarlo (solo mercancía con precio de compra registrado)" />
         <CardBody className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <DataRow label="Se vendió" value={cop(Math.round(g.vendidoConCosto))} />
-            <DataRow label="Costó comprarlo" value={cop(Math.round(g.costo))} tone="danger" />
-            <DataRow label={`Ganancia${margen ? ` (${margen} %)` : ""}`} value={cop(ganancia)} tone={ganancia >= 0 ? "success" : "danger"} strong />
-          </div>
+          <StatPanel>
+            <Stat label="Se vendió" value={cop(Math.round(g.vendidoConCosto))} />
+            <Stat label="Costó comprarlo" value={cop(Math.round(g.costo))} tone="danger" />
+            <Stat label="Ganancia" value={cop(ganancia)} tone={ganancia >= 0 ? "success" : "danger"} detail={margen ? `${margen} % de lo vendido` : undefined} />
+          </StatPanel>
           {g.gramosConCosto > 0 && <p className="text-base text-neutral-500">{gramos(g.gramosConCosto)} vendidos con costo registrado.</p>}
           {g.vendidoSinCosto > 0 && (
             <p className="text-base text-neutral-500">
@@ -283,7 +285,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Ventas y gastos por día" description="Barra dorada = ventas · barra gris = gastos" />
+          <CardHeader title="Ventas y gastos por día"/>
           <CardBody>
             <GraficoVentasGastos datos={serie.map(({ dia, ventas, gastos }) => ({ dia, ventas, gastos }))} />
           </CardBody>

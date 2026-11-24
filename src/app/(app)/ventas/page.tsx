@@ -1,4 +1,5 @@
-import { ShoppingBag, SlidersHorizontal, Search, Receipt } from "lucide-react";
+import { History, ShoppingBag, SlidersHorizontal, Search, Receipt } from "lucide-react";
+import { puedeVer } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, finDia, inicioDia, parseFechaISO, sumarDias } from "@/lib/fechas";
@@ -114,9 +115,16 @@ export default async function VentasPage({
         title="Facturas"
         help="Aquí están las ventas ya hechas. Toque una para verla, imprimirla o anularla."
         actions={
-          <Button href="/ventas/nueva" size="lg" icon={ShoppingBag}>
-            Nueva venta
-          </Button>
+          <>
+            <Button href="/ventas/historial" variant="secondary" size="lg" icon={History}>
+              Ver todas
+            </Button>
+            {puedeVer(s, "vender") && (
+              <Button href="/ventas/nueva" size="lg" icon={ShoppingBag}>
+                Nueva venta
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -244,7 +252,10 @@ export default async function VentasPage({
 
       {ventas.length === LIMITE && (
         <p className="text-center text-base text-neutral-500">
-          Se muestran las {LIMITE} facturas más recientes. Use los filtros para encontrar otras.
+          Se muestran las {LIMITE} facturas más recientes.{" "}
+          <Button variant="link" href="/ventas/historial">
+            Ver todas, con páginas
+          </Button>
         </p>
       )}
     </PageContainer>

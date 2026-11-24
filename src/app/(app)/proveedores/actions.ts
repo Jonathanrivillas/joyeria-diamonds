@@ -16,7 +16,9 @@ export async function guardarProveedor(form: FormData) {
     telefono: String(form.get("telefono") || "").trim(),
     notas: String(form.get("notas") || "").trim(),
   };
-  const volver = (clave: "ok" | "error", msg: string) => redirect(`/proveedores?${clave}=${encodeURIComponent(msg)}`);
+  // Si se editó desde la página del proveedor, se vuelve a ella; si no, a la lista.
+  const ruta = id && form.get("volver") === "detalle" ? `/proveedores/${id}` : "/proveedores";
+  const volver = (clave: "ok" | "error", msg: string) => redirect(`${ruta}?${clave}=${encodeURIComponent(msg)}`);
 
   if (data.nombre.length < 2) volver("error", "Escriba el nombre del proveedor.");
   if (data.nombre.length > 80 || data.documento.length > 30 || data.telefono.length > 30 || data.notas.length > 200)
@@ -37,7 +39,7 @@ export async function guardarProveedor(form: FormData) {
     const nuevo = await db.proveedor.create({ data });
     await auditar(s, "PROVEEDOR_CREADO", { entidad: "Proveedor", entidadId: nuevo.id, detalle: data });
   }
-  revalidatePath("/proveedores");
+  revalidatePath("/proveedores", "layout");
   volver("ok", id ? `Se guardaron los cambios de ${data.nombre}.` : `Listo, ${data.nombre} quedó en la lista.`);
 }
 
@@ -49,5 +51,10 @@ export async function alternarProveedor(form: FormData) {
   if (!p) return;
   await db.proveedor.update({ where: { id }, data: { activo: !p.activo } });
   await auditar(s, p.activo ? "PROVEEDOR_DESACTIVADO" : "PROVEEDOR_ACTIVADO", { entidad: "Proveedor", entidadId: id, detalle: { nombre: p.nombre } });
-  revalidatePath("/proveedores");
+  revalidatePath("/proveedores", "layout");
+  redirect(
+    `/proveedores/${id}?ok=${encodeURIComponent(
+      p.activo ? `${p.nombre} quedó inactivo: ya no aparece para escoger, pero su historial se conserva.` : `${p.nombre} está activo otra vez.`,
+    )}`,
+  );
 }

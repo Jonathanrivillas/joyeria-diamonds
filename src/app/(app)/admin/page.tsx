@@ -1,4 +1,4 @@
-import { History, Plus, Save, ShieldCheck, UserPlus } from "lucide-react";
+import { Gem, History, Plus, Save, ShieldCheck, Store, UserPlus } from "lucide-react";
 import { PERMISOS, PERMISOS_DEFECTO } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { esSoporte, requireAdmin } from "@/lib/session";
@@ -28,9 +28,9 @@ import {
 } from "./actions";
 
 /** Una casilla por pantalla. El formulario manda todas las marcadas con el nombre "permisos". */
-function CasillasPermisos({ marcados }: { marcados: string[] }) {
+function CasillasPermisos({ marcados, columnas = 2 }: { marcados: string[]; columnas?: 1 | 2 }) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className={columnas === 2 ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1"}>
       {PERMISOS.map((p) => (
         <Checkbox key={p.clave} variant="card" name="permisos" value={p.clave} label={p.nombre} description={p.detalle} defaultChecked={marcados.includes(p.clave)} />
       ))}
@@ -63,98 +63,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </Button>
         }
       />
-
-      {soporte && (
-        <>
-          <Section
-            title="Tipos de pieza (solo soporte)"
-            description="Todo se vende por gramos al precio del día que la administradora pone en el inicio. Aquí solo se cambia el nombre o se deja de vender un tipo de pieza."
-          >
-            <Card>
-              <div className="divide-y divide-neutral-100">
-                {[...categorias, null].map((c) => (
-                  <form
-                    key={c?.id ?? "nueva"}
-                    action={guardarCategoria}
-                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
-                  >
-                    <input type="hidden" name="id" value={c?.id ?? ""} />
-                    <Input
-                      label="Nombre"
-                      hideLabel
-                      name="nombre"
-                      defaultValue={c?.nombre ?? ""}
-                      placeholder="Nuevo tipo de pieza..."
-                    />
-                    {c ? (
-                      <Checkbox
-                        label="Se sigue vendiendo"
-                        name="activa"
-                        defaultChecked={c.activa}
-                      />
-                    ) : (
-                      <span />
-                    )}
-                    <Button
-                      type="submit"
-                      variant={c ? "secondary" : "primary"}
-                      icon={c ? Save : Plus}
-                    >
-                      {c ? "Guardar" : "Agregar"}
-                    </Button>
-                  </form>
-                ))}
-              </div>
-            </Card>
-          </Section>
-
-          <Section title="Locales (solo soporte)">
-            <Card>
-              <div className="divide-y divide-neutral-100">
-                {[...locales, null].map((l) => (
-                  <form
-                    key={l?.id ?? "nuevo"}
-                    action={guardarLocal}
-                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_7rem_auto]"
-                  >
-                    <input type="hidden" name="id" value={l?.id ?? ""} />
-                    <Input
-                      label="Nombre del local"
-                      hideLabel
-                      name="nombre"
-                      defaultValue={l?.nombre ?? ""}
-                      placeholder="Nombre del nuevo local"
-                    />
-                    <Input
-                      label="Dirección"
-                      hideLabel
-                      name="direccion"
-                      defaultValue={l?.direccion ?? ""}
-                      placeholder="Dirección"
-                    />
-                    <Input
-                      label="Prefijo de factura"
-                      hideLabel
-                      name="prefijo"
-                      defaultValue={l?.prefijoFactura ?? ""}
-                      placeholder="Prefijo"
-                      disabled={!!l}
-                      title="Prefijo de factura"
-                    />
-                    <Button
-                      type="submit"
-                      variant={l ? "secondary" : "primary"}
-                      icon={l ? Save : Plus}
-                    >
-                      {l ? "Guardar" : "Agregar"}
-                    </Button>
-                  </form>
-                ))}
-              </div>
-            </Card>
-          </Section>
-        </>
-      )}
 
       <div id="usuarios" className="scroll-mt-24 space-y-3">
         {sp.ok && <Alert tone="success">{sp.ok}</Alert>}
@@ -253,7 +161,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </div>
               <fieldset className="space-y-2">
                 <legend className="text-base font-semibold">Qué pantallas puede ver (solo vendedores)</legend>
-                <CasillasPermisos marcados={PERMISOS_DEFECTO} />
+                <CasillasPermisos marcados={PERMISOS_DEFECTO} columnas={1} />
               </fieldset>
               <SubmitButton block loadingText="Creando...">
                 <Icon icon={UserPlus} /> Crear
@@ -262,6 +170,92 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </Card>
         </div>
       </Section>
+
+      {soporte && (
+        <Section title="Solo soporte técnico" description="Configuración que casi nunca se cambia. Toque para abrirla.">
+          <Disclosure title="Tipos de pieza" icon={Gem}>
+            <p className="mb-4 text-base text-neutral-600">Todo se vende por gramos al precio del día que la administradora pone en el inicio. Aquí solo se cambia el nombre o se deja de vender un tipo de pieza.</p>
+            <div className="-mx-5 -mb-5 divide-y divide-neutral-100 border-t border-neutral-100">
+                {[...categorias, null].map((c) => (
+                  <form
+                    key={c?.id ?? "nueva"}
+                    action={guardarCategoria}
+                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+                  >
+                    <input type="hidden" name="id" value={c?.id ?? ""} />
+                    <Input
+                      label="Nombre"
+                      hideLabel
+                      name="nombre"
+                      defaultValue={c?.nombre ?? ""}
+                      placeholder="Nuevo tipo de pieza..."
+                    />
+                    {c ? (
+                      <Checkbox
+                        label="Se sigue vendiendo"
+                        name="activa"
+                        defaultChecked={c.activa}
+                      />
+                    ) : (
+                      <span />
+                    )}
+                    <Button
+                      type="submit"
+                      variant={c ? "secondary" : "primary"}
+                      icon={c ? Save : Plus}
+                    >
+                      {c ? "Guardar" : "Agregar"}
+                    </Button>
+                  </form>
+                ))}
+              </div>
+          </Disclosure>
+
+          <Disclosure title="Locales" icon={Store}>
+            <div className="-mx-5 -mb-5 divide-y divide-neutral-100 border-t border-neutral-100">
+                {[...locales, null].map((l) => (
+                  <form
+                    key={l?.id ?? "nuevo"}
+                    action={guardarLocal}
+                    className="grid grid-cols-1 items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_7rem_auto]"
+                  >
+                    <input type="hidden" name="id" value={l?.id ?? ""} />
+                    <Input
+                      label="Nombre del local"
+                      hideLabel
+                      name="nombre"
+                      defaultValue={l?.nombre ?? ""}
+                      placeholder="Nombre del nuevo local"
+                    />
+                    <Input
+                      label="Dirección"
+                      hideLabel
+                      name="direccion"
+                      defaultValue={l?.direccion ?? ""}
+                      placeholder="Dirección"
+                    />
+                    <Input
+                      label="Prefijo de factura"
+                      hideLabel
+                      name="prefijo"
+                      defaultValue={l?.prefijoFactura ?? ""}
+                      placeholder="Prefijo"
+                      disabled={!!l}
+                      title="Prefijo de factura"
+                    />
+                    <Button
+                      type="submit"
+                      variant={l ? "secondary" : "primary"}
+                      icon={l ? Save : Plus}
+                    >
+                      {l ? "Guardar" : "Agregar"}
+                    </Button>
+                  </form>
+                ))}
+              </div>
+          </Disclosure>
+        </Section>
+      )}
     </PageContainer>
   );
 }

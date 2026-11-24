@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Badge, Icon, NoValue, Table, Td, Th, Tr, cn } from "@/components/ui";
-import { cop, hora, METODOS_PAGO } from "@/lib/format";
+import { cop, fecha, hora, METODOS_PAGO } from "@/lib/format";
 import type { VentaResumen } from "./venta-fila";
 
 export type GrupoVentas = { iso: string; titulo: string; total: number; ventas: VentaResumen[] };
@@ -10,13 +10,24 @@ export type GrupoVentas = { iso: string; titulo: string; total: number; ventas: 
  * Facturas en tabla, para pantallas anchas (en celular se usa la lista con VentaFila).
  * Toda la fila es un enlace a la factura. Con `porDia` cada grupo lleva su encabezado con el total del día.
  */
-export function VentasTabla({ grupos, porDia, mostrarLocal }: { grupos: GrupoVentas[]; porDia: boolean; mostrarLocal: boolean }) {
+export function VentasTabla({
+  grupos,
+  porDia,
+  mostrarLocal,
+  conFecha,
+}: {
+  grupos: GrupoVentas[];
+  porDia: boolean;
+  mostrarLocal: boolean;
+  /** Historial: la primera columna muestra fecha y hora (no solo la hora). */
+  conFecha?: boolean;
+}) {
   const columnas = mostrarLocal ? 8 : 7;
   return (
     <Table>
       <thead>
         <tr>
-          <Th className="w-28">Hora</Th>
+          <Th className={conFecha ? "w-40" : "w-28"}>{conFecha ? "Fecha" : "Hora"}</Th>
           <Th>Factura</Th>
           <Th>Piezas</Th>
           <Th>Cliente</Th>
@@ -45,7 +56,16 @@ export function VentasTabla({ grupos, porDia, mostrarLocal }: { grupos: GrupoVen
             const anulada = v.estado === "ANULADA";
             return (
               <Tr key={v.id} className={cn("relative", anulada && "text-neutral-500")}>
-                <Td className="whitespace-nowrap tabular-nums">{hora(v.fecha)}</Td>
+                <Td className="whitespace-nowrap tabular-nums">
+                  {conFecha ? (
+                    <>
+                      <span className="block">{fecha(v.fecha)}</span>
+                      <span className="block text-sm text-neutral-500">{hora(v.fecha)}</span>
+                    </>
+                  ) : (
+                    hora(v.fecha)
+                  )}
+                </Td>
                 <Td className="whitespace-nowrap font-semibold">
                   <Link
                     href={`/ventas/${v.id}`}

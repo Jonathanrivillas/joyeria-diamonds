@@ -1,14 +1,13 @@
-import { Pencil, Plus, Save, Truck } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Plus, Truck } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import {
   Alert,
   Card,
   CardHeader,
-  Disclosure,
   EmptyState,
   Icon,
-  Input,
   LabeledValue,
   PageContainer,
   PageHeader,
@@ -17,22 +16,8 @@ import {
   cn,
 } from "@/components/ui";
 import { cop, plural } from "@/lib/format";
-import { alternarProveedor, guardarProveedor } from "./actions";
-
-type Proveedor = { id: number; nombre: string; documento: string; telefono: string; notas: string };
-
-/** Mismos campos para crear y para editar. */
-function CamposProveedor({ p }: { p?: Proveedor }) {
-  return (
-    <>
-      <input type="hidden" name="id" value={p?.id ?? ""} />
-      <Input label="Nombre" name="nombre" defaultValue={p?.nombre} required placeholder="Ej: Japón" />
-      <Input label="NIT o cédula (si lo tiene)" name="documento" defaultValue={p?.documento} inputMode="numeric" />
-      <Input label="Teléfono (si lo tiene)" name="telefono" defaultValue={p?.telefono} inputMode="tel" />
-      <Input label="Notas (si quiere)" name="notas" defaultValue={p?.notas} placeholder="Ej: oro 18k, cuenta Bancolombia..." />
-    </>
-  );
-}
+import { guardarProveedor } from "./actions";
+import { CamposProveedor } from "./campos-proveedor";
 
 export default async function ProveedoresPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   await requireAdmin();
@@ -52,7 +37,7 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
     <PageContainer className="space-y-6">
       <PageHeader
         title="Proveedores"
-        help="Las personas o empresas a quienes la joyería les compra oro, insumos o servicios. Después podrá escogerlos al anotar gastos, al ingresar mercancía y en las ventas que les pagan a ellos."
+        help="Después de crear los proveedores podrá escogerlos al anotar gastos, al ingresar mercancía y en las ventas que les pagan a ellos."
       />
 
       {sp.ok && <Alert tone="success">{sp.ok}</Alert>}
@@ -70,22 +55,25 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
                 const salio = pagadoA.get(p.id) ?? { total: 0, n: 0 };
                 const diferencia = entro.total - salio.total;
                 return (
-                <li key={p.id} className="space-y-3 px-5 py-4">
+                <li key={p.id} className="relative space-y-3 px-5 py-4 transition hover:bg-neutral-50">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <div className="min-w-0 flex-1 basis-56">
-                      <p className="text-lg font-semibold">{p.nombre}</p>
+                      {/* Toda la fila lleva al detalle del proveedor. */}
+                      <Link
+                        href={`/proveedores/${p.id}`}
+                        className="text-lg font-semibold after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-brand-400"
+                      >
+                        {p.nombre}
+                      </Link>
                       {(p.documento || p.telefono) && (
                         <p className="text-base text-neutral-600">{[p.documento && `NIT/C.C. ${p.documento}`, p.telefono && `Tel. ${p.telefono}`].filter(Boolean).join(" · ")}</p>
                       )}
                       {p.notas && <p className="text-sm text-neutral-500">{p.notas}</p>}
                     </div>
                     <StatusBadge status={p.activo ? "HABILITADO" : "INACTIVO"} />
-                    <form action={alternarProveedor}>
-                      <input type="hidden" name="id" value={p.id} />
-                      <SubmitButton size="sm" variant={p.activo ? "danger-outline" : "secondary"} loadingText="Un momento...">
-                        {p.activo ? "Desactivar" : "Activar"}
-                      </SubmitButton>
-                    </form>
+                    <span className="flex items-center gap-1 text-base font-semibold text-brand-800">
+                      Ver todo <Icon icon={ChevronRight} />
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 gap-2 rounded-xl bg-neutral-50 p-3 sm:grid-cols-3">
                     <LabeledValue label="Le llegó de nuestras ventas">
@@ -103,16 +91,6 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
                       <p className="text-sm text-neutral-500">lo que le llegó menos lo pagado</p>
                     </LabeledValue>
                   </div>
-                  <Disclosure title="Editar datos" icon={Pencil}>
-                    <form action={guardarProveedor} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <CamposProveedor p={p} />
-                      <div className="sm:col-span-2">
-                        <SubmitButton loadingText="Guardando...">
-                          <Icon icon={Save} /> Guardar cambios
-                        </SubmitButton>
-                      </div>
-                    </form>
-                  </Disclosure>
                 </li>
                 );
               })}

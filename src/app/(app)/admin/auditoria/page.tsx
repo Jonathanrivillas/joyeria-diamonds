@@ -138,7 +138,15 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
         )}
       </Card>
 
-      <Pagination page={pagina} pages={paginas} href={(n) => `/admin/auditoria?pagina=${n}`} previousLabel="Más recientes" nextLabel="Más antiguos" />
+      <Pagination
+        page={pagina}
+        pages={paginas}
+        total={total}
+        perPage={POR_PAGINA}
+        href={(n) => `/admin/auditoria?pagina=${n}`}
+        previousLabel="Más recientes"
+        nextLabel="Más antiguos"
+      />
     </PageContainer>
   );
 }

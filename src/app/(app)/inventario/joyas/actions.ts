@@ -131,7 +131,6 @@ export async function registrarJoya(_prev: EstadoJoya, form: FormData): Promise<
           tx,
         );
       },
-      { maxWait: 10_000, timeout: 20_000 },
     );
   } catch (e) {
     return { error: (e as Error).message };

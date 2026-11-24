@@ -33,7 +33,7 @@ export default async function NuevaVentaPage({ searchParams }: { searchParams: P
         joyas={joyas}
         precioGramo={precio.valor}
         frase={
-          <p className={`${letraBonita.className} text-3xl leading-tight text-brand-700 sm:text-4xl`}>
+          <p className={`${letraBonita.className} text-[1.45rem] leading-tight text-brand-700 sm:text-4xl`}>
             {FRASE_NEGOCIO}
           </p>
         }

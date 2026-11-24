@@ -74,9 +74,9 @@ export function Stat({
   tone?: Tone;
 }) {
   return (
-    <div className="p-5">
+    <div className="px-5 py-3.5 sm:py-5">
       <p className="text-base text-neutral-600">{label}</p>
-      <p className={cn("mt-1 text-3xl font-bold tabular-nums", toneText[tone])}>{value}</p>
+      <p className={cn("mt-1 text-2xl font-bold tabular-nums sm:text-3xl", toneText[tone])}>{value}</p>
       {detail && <p className="mt-1 text-base text-neutral-500">{detail}</p>}
     </div>
   );

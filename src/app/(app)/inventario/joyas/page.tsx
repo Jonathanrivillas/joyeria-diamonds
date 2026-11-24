@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { cop, gramos, fechaHora, plural } from "@/lib/format";
 import { asegurarCategoriaJoyas, TIPOS_JOYA } from "@/lib/joyas";
+import { enlaceCon, leerPagina, paginar, POR_PAGINA } from "@/lib/listas";
 import {
   Alert,
   Card,
@@ -16,6 +17,7 @@ import {
   MoneyInput,
   PageContainer,
   PageHeader,
+  Pagination,
   Select,
   Stat,
   StatPanel,
@@ -27,7 +29,7 @@ import { editarJoya, moverJoya } from "./actions";
 export default async function JoyasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ver?: string; buscar?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ ver?: string; buscar?: string; ok?: string; error?: string; pagina?: string }>;
 }) {
   const sp = await searchParams;
   const s = await requirePermiso("inventario");
@@ -37,20 +39,19 @@ export default async function JoyasPage({
   const vendidas = sp.ver === "vendidas";
   const buscar = (sp.buscar ?? "").trim();
 
+  const where = {
+    categoriaId: cat.id,
+    estado: vendidas ? "VENDIDA" : "DISPONIBLE",
+    ...(localId ? { localId } : {}),
+    ...(buscar
+      ? { OR: [{ codigo: { contains: buscar, mode: "insensitive" as const } }, { descripcion: { contains: buscar, mode: "insensitive" as const } }] }
+      : {}),
+  };
+  const [total, sumas] = await Promise.all([db.pieza.count({ where }), db.pieza.aggregate({ where, _sum: { precio: true, pesoCg: true } })]);
+  const { paginas, actual, skip, take } = paginar(total, leerPagina(sp.pagina));
+
   const [piezas, proveedores, categoriasOrigen] = await Promise.all([
-    db.pieza.findMany({
-      where: {
-        categoriaId: cat.id,
-        estado: vendidas ? "VENDIDA" : "DISPONIBLE",
-        ...(localId ? { localId } : {}),
-        ...(buscar
-          ? { OR: [{ codigo: { contains: buscar, mode: "insensitive" } }, { descripcion: { contains: buscar, mode: "insensitive" } }] }
-          : {}),
-      },
-      orderBy: { codigo: "asc" },
-      include: { local: true, proveedor: true },
-      take: 300,
-    }),
+    db.pieza.findMany({ where, orderBy: { codigo: "asc" }, include: { local: true, proveedor: true }, skip, take }),
     esAdmin ? db.proveedor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }) : [],
     // De dónde puede salir una joya que ya estaba en inventario: las esmeraldas primero.
     esAdmin
@@ -64,8 +65,8 @@ export default async function JoyasPage({
   const origenes = [...categoriasOrigen]
     .filter((c) => c.activa || c.existencias.some((e) => e.cantidad > 0))
     .sort((a, b) => Number(/esmeralda/i.test(b.nombre)) - Number(/esmeralda/i.test(a.nombre)));
-  const valorTotal = piezas.reduce((a, p) => a + p.precio, 0);
-  const pesoTotal = piezas.reduce((a, p) => a + p.pesoCg, 0);
+  const valorTotal = sumas._sum.precio ?? 0;
+  const pesoTotal = sumas._sum.pesoCg ?? 0;
   const qs = (ver?: string) => `/inventario/joyas${ver ? `?ver=${ver}` : ""}`;
 
   return (
@@ -107,7 +108,7 @@ export default async function JoyasPage({
 
           {!vendidas && (
             <StatPanel columns={2}>
-              <Stat label="Joyas disponibles" value={plural(piezas.length, "joya", "joyas")} detail={gramos(pesoTotal)} />
+              <Stat label="Joyas disponibles" value={plural(total, "joya", "joyas")} detail={gramos(pesoTotal)} />
               <Stat label="Valen (precio de venta)" value={cop(valorTotal)} />
             </StatPanel>
           )}
@@ -174,7 +175,7 @@ export default async function JoyasPage({
               </ul>
             )}
           </Card>
-          {piezas.length === 300 && <p className="text-sm text-neutral-500">Se muestran las primeras 300. Use el buscador para encontrar una joya.</p>}
+          <Pagination page={actual} pages={paginas} total={total} perPage={POR_PAGINA} href={(n) => enlaceCon("/inventario/joyas", { ver: vendidas ? "vendidas" : undefined, buscar: buscar || undefined, pagina: n })} />
           {!esAdmin && (
             <p className="text-base text-neutral-500">
               Para vender una joya, vaya a <Link href="/ventas/nueva" className="text-brand-800 underline">Vender</Link> y toque “{cat.nombre}”.

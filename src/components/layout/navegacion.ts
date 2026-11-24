@@ -39,7 +39,7 @@ export const OTROS: Modulo[] = [MODULOS.facturas, MODULOS.reportes, MODULOS.tras
 
 export function esActivo(path: string, href: string) {
   if (href === "/") return path === "/";
-  if (href === "/ventas") return path === "/ventas" || /^\/ventas\/\d+/.test(path);
+  if (href === "/ventas") return path === "/ventas" || /^\/ventas\/(\d+|historial)/.test(path);
   return path.startsWith(href);
 }
 

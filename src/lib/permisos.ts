@@ -5,7 +5,7 @@ export type Permiso = "inicio" | "vender" | "facturas" | "inventario" | "gastos"
 
 /** Pantallas que el administrador puede habilitar a cada vendedor, en el orden del menú. */
 export const PERMISOS: { clave: Permiso; nombre: string; detalle: string; href: string }[] = [
-  { clave: "vender", nombre: "Vender", detalle: "Hacer ventas (con el precio del gramo que pone el administrador)", href: "/ventas/nueva" },
+  { clave: "vender", nombre: "Vender", detalle: "Hacer ventas al precio del gramo de hoy", href: "/ventas/nueva" },
   { clave: "facturas", nombre: "Facturas", detalle: "Ver e imprimir las ventas ya hechas", href: "/ventas" },
   { clave: "inicio", nombre: "Inicio", detalle: "Resumen del día: lo vendido y lo gastado", href: "/" },
   { clave: "inventario", nombre: "Inventario", detalle: "Lo que hay en vitrina", href: "/inventario" },

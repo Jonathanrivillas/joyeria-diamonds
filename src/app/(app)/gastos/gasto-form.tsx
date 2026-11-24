@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { registrarGasto } from "./actions";
-import { Alert, Button, Card, Chip, ChipGroup, ChoiceGrid, ChoiceTile, Field, FileButton, MoneyInput, Textarea } from "@/components/ui";
+import { Alert, Button, Card, Chip, ChipGroup, ChoiceTile, Field, FileButton, MoneyInput, Textarea } from "@/components/ui";
 import { GRUPOS_GASTO as GRUPOS } from "@/components/gastos/tipos-gasto";
 import { TAMANO_MAXIMO } from "@/lib/archivos";
 
@@ -120,7 +120,7 @@ export function GastoForm({
 
   return (
     <Card padding="lg">
-      <form key={formKey} action={accion} className="space-y-6">
+      <form key={formKey} action={accion} className="space-y-6 [&>h2]:!mt-0">
         <h2 className="text-2xl font-bold">Anotar un gasto</h2>
 
         {estado?.ok && <Alert tone="success">{estado.ok}</Alert>}
@@ -140,7 +140,8 @@ export function GastoForm({
 
         <Field label={`${n(1)}. ¿Qué tipo de gasto es?`}>
           <input type="hidden" name="tipo" value={tipo} />
-          <ChoiceGrid columns={2}>
+          {/* En el celular, una opción por línea: así la descripción se lee completa. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {GRUPOS.map((g, i) => (
               <ChoiceTile
                 key={g.id}
@@ -150,10 +151,10 @@ export function GastoForm({
                 icon={g.icon}
                 title={g.nombre}
                 description={g.detalle}
-                className={i === GRUPOS.length - 1 && GRUPOS.length % 2 === 1 ? "col-span-2" : undefined}
+                className={i === GRUPOS.length - 1 && GRUPOS.length % 2 === 1 ? "sm:col-span-2" : undefined}
               />
             ))}
-          </ChoiceGrid>
+          </div>
         </Field>
 
         {subtipos && (

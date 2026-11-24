@@ -2,7 +2,7 @@ import { ArrowLeftRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { fechaHora, gramos } from "@/lib/format";
-import { Card, CardHeader, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr } from "@/components/ui";
+import { Button, Card, CardHeader, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr } from "@/components/ui";
 import { TrasladoForm } from "./traslado-form";
 
 export default async function TrasladosPage() {
@@ -13,7 +13,7 @@ export default async function TrasladosPage() {
     db.categoria.findMany({ where: { activa: true, esServicio: false, porPieza: false }, orderBy: { orden: "asc" } }),
     db.traslado.findMany({
       orderBy: { fecha: "desc" },
-      take: 50,
+      take: 10, // los más recientes; el resto en "Ver todos"
       include: { origen: true, destino: true, usuario: true, items: { include: { categoria: true } } },
     }),
   ]);
@@ -30,7 +30,14 @@ export default async function TrasladosPage() {
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre, controlaPeso: c.controlaPeso }))}
         />
         <Card>
-          <CardHeader title="Últimos traslados" />
+          <CardHeader
+            title="Últimos traslados"
+            action={
+              <Button href="/traslados/historial" variant="link">
+                Ver todos
+              </Button>
+            }
+          />
           {traslados.length === 0 ? (
             <EmptyState icon={ArrowLeftRight} title="Aún no hay traslados." />
           ) : (

@@ -22,13 +22,13 @@ export function ProgressBar({ value, max, label }: { value: number; max: number;
 /** Indicador de pasos numerados (ej. "1 Escoger las piezas — 2 Cobrar"). `current` empieza en 1. */
 export function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
-    <ol className="flex flex-wrap items-center gap-3 text-base font-semibold">
+    <ol className="flex items-center gap-2 text-base font-semibold sm:gap-3">
       {steps.map((t, i) => {
         const n = i + 1;
         const done = current > n;
         const active = current === n;
         return (
-          <li key={t} className="flex items-center gap-3" aria-current={active ? "step" : undefined}>
+          <li key={t} className="flex items-center gap-2 sm:gap-3" aria-current={active ? "step" : undefined}>
             <span
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-full text-lg",
@@ -37,8 +37,9 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
             >
               {done ? <Icon icon={Check} /> : n}
             </span>
-            <span className={active ? "text-neutral-900" : "text-neutral-500"}>{t}</span>
-            {n < steps.length && <span aria-hidden className="h-0.5 w-8 bg-neutral-300" />}
+            {/* En el celular solo se lee el nombre del paso actual: así los 3 pasos caben en una línea. */}
+            <span className={active ? "text-neutral-900" : "sr-only text-neutral-500 sm:not-sr-only"}>{t}</span>
+            {n < steps.length && <span aria-hidden className="h-0.5 w-4 bg-neutral-300 sm:w-8" />}
           </li>
         );
       })}

@@ -183,7 +183,7 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
         });
       }
       return venta;
-    }, { maxWait: 10_000, timeout: 20_000 }); // Neon puede tardar en "despertar"
+    }); // el tiempo de la transacción se define para todo el sistema en src/lib/db.ts
     // Primero se guarda la venta; después se envía a Alegra. Si Alegra falla, la venta no se pierde.
     if (v.facturaElectronica) await facturarVenta(venta.id);
     revalidatePath("/", "layout");

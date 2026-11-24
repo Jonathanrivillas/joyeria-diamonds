@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Banknote, Check, CreditCard, Plus, Search, SearchX, Smartphone, Trash2, Pencil, ShoppingBag, UserPlus, FileText, Store } from "lucide-react";
+import { ArrowRight, Banknote, Check, CreditCard, Plus, Search, SearchX, Smartphone, Trash2, Pencil, ShoppingBag, UserPlus, FileText } from "lucide-react";
 import { publicarLocalVenta } from "@/components/ventas/local-venta";
 import { crearVenta } from "../actions";
 import { cop, gramos, parseGramos, TIPOS_JOYA } from "@/lib/format";
@@ -255,12 +255,13 @@ export function VentaForm({
     const d = disponible(c.id);
     return d.cantidad <= 0 || (c.controlaPeso && d.pesoCg <= 0);
   };
-  // Lo disponible primero; lo agotado al final.
+  // Lo que se puede vender va en recuadros; lo agotado, en una línea de texto aparte (se lee mejor que
+  // recuadros grises deshabilitados y no le quita espacio a lo que sí hay).
   const sinTildes = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
   const filtro = sinTildes(buscar.trim());
-  const categoriasOrden = [...categorias]
-    .sort((a, b) => Number(agotado(a)) - Number(agotado(b)))
-    .filter((c) => !filtro || sinTildes(c.nombre).includes(filtro));
+  const categoriasOrden = categorias.filter((c) => !filtro || sinTildes(c.nombre).includes(filtro));
+  const disponibles = categoriasOrden.filter((c) => !agotado(c));
+  const agotadas = categoriasOrden.filter((c) => agotado(c));
   const conBuscador = categorias.length > 9;
   const elegirLocal = esAdmin && locales.length > 1;
   const resumenCarrito = (
@@ -277,11 +278,7 @@ export function VentaForm({
         title={facturaE ? "Venta con factura electrónica" : "Vender"}
         subtitle={precioGramo > 0 ? <>Precio del gramo hoy: <span className="font-bold text-neutral-900">{cop(precioGramo)}</span></> : undefined}
         center={frase}
-        back={
-          facturaE
-            ? { href: "/ventas/nueva", label: "Volver a la venta normal" }
-            : { href: "/", label: "Volver al inicio", mobileOnly: true }
-        }
+        back={facturaE ? { href: "/ventas/nueva", label: "Volver a la venta normal" } : undefined}
         actions={
           <>
             {elegirLocal && (
@@ -350,20 +347,27 @@ export function VentaForm({
               </EmptyState>
             )}
             <ChoiceGrid columns={5}>
-              {categoriasOrden.map((c) => {
+              {disponibles.map((c) => {
                 const d = disponible(c.id);
                 return (
                   <ChoiceTile
                     key={c.id}
                     layout="start"
-                    disabled={agotado(c)}
                     onClick={() => elegir(c)}
                     title={c.nombre}
-                    description={c.esServicio ? "Trabajo" : agotado(c) ? "Agotado" : c.porPieza ? `Hay ${piezas(joyasLibres(c.id).length).replace("pieza", "joya")}` : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
+                    description={c.esServicio ? "Trabajo" : c.porPieza ? `Hay ${piezas(joyasLibres(c.id).length).replace("pieza", "joya")}` : c.controlaPeso ? `Hay ${gramos(d.pesoCg)} · ${d.cantidad} pzs` : `Hay ${d.cantidad} piezas`}
                   />
                 );
               })}
             </ChoiceGrid>
+            {agotadas.length > 0 && (
+              <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/60 px-5 py-4">
+                <p className="text-base font-semibold text-neutral-700">
+                  Agotado en {nombreLocal ?? "este local"} ({agotadas.length})
+                </p>
+                <p className="mt-1 text-base leading-relaxed text-neutral-600">{agotadas.map((c) => c.nombre).join(" · ")}</p>
+              </div>
+            )}
           </Section>
 
           {carrito.length > 0 && (
@@ -621,39 +625,11 @@ export function VentaForm({
 
               <div className="space-y-3 p-5 sm:p-6">
                 <h2 className="text-xl font-bold text-neutral-800">¿Cómo le pagan?</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {METODOS.map((m) => (
-                    <ChoiceTile key={m.id} selected={metodo === m.id} onClick={() => setMetodo(m.id)} icon={m.icon} title={m.nombre} className="p-5 text-xl" />
+                    <ChoiceTile key={m.id} selected={metodo === m.id} onClick={() => setMetodo(m.id)} icon={m.icon} title={m.nombre} className="px-1 py-4 sm:p-5 sm:text-xl [&_span]:text-[0.95rem] sm:[&_span]:text-lg" />
                   ))}
                 </div>
-              </div>
-
-              <div className="space-y-3 p-5 sm:p-6">
-                <h2 className="text-xl font-bold text-neutral-800">¿Dónde se hizo la venta?</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <ChoiceTile selected={canal === "TIENDA"} onClick={() => setCanal("TIENDA")} icon={Store} title="En la tienda" className="p-5 text-xl" />
-                  <ChoiceTile selected={canal === "REDES"} onClick={() => setCanal("REDES")} icon={Smartphone} title="Por redes" className="p-5 text-xl" />
-                </div>
-                {canal === "REDES" && (
-                  <>
-                    <p className="text-lg text-neutral-700">¿Por cuál red?</p>
-                    <ChipGroup>
-                      {([
-                        ["WHATSAPP", "WhatsApp"],
-                        ["INSTAGRAM", "Instagram"],
-                        ["FACEBOOK", "Facebook"],
-                        ["OTRA", "Otra"],
-                      ] as const).map(([id, nombre]) => (
-                        <Chip key={id} selected={red === id} onClick={() => setRed(id)}>
-                          {nombre}
-                        </Chip>
-                      ))}
-                    </ChipGroup>
-                    {red === "OTRA" && (
-                      <Input label="¿Cuál?" value={redOtra} onChange={(e) => setRedOtra(e.target.value)} autoFocus />
-                    )}
-                  </>
-                )}
               </div>
 
               {metodo === "TRANSFERENCIA" && proveedores.length > 0 && (
@@ -693,6 +669,39 @@ export function VentaForm({
                     ))}
                 </div>
               )}
+
+              {/* Pregunta secundaria (casi siempre "En la tienda"): va compacta y después del pago. */}
+              <div className="space-y-3 p-5 sm:p-6">
+                <h2 className="text-lg font-bold text-neutral-800">¿Dónde se hizo la venta?</h2>
+                <ChipGroup>
+                  <Chip selected={canal === "TIENDA"} onClick={() => setCanal("TIENDA")}>
+                    En la tienda
+                  </Chip>
+                  <Chip selected={canal === "REDES"} onClick={() => setCanal("REDES")}>
+                    Por redes
+                  </Chip>
+                </ChipGroup>
+                {canal === "REDES" && (
+                  <>
+                    <p className="text-base text-neutral-700">¿Por cuál red?</p>
+                    <ChipGroup>
+                      {([
+                        ["WHATSAPP", "WhatsApp"],
+                        ["INSTAGRAM", "Instagram"],
+                        ["FACEBOOK", "Facebook"],
+                        ["OTRA", "Otra"],
+                      ] as const).map(([id, nombre]) => (
+                        <Chip key={id} selected={red === id} onClick={() => setRed(id)}>
+                          {nombre}
+                        </Chip>
+                      ))}
+                    </ChipGroup>
+                    {red === "OTRA" && (
+                      <Input label="¿Cuál?" value={redOtra} onChange={(e) => setRedOtra(e.target.value)} autoFocus />
+                    )}
+                  </>
+                )}
+              </div>
 
               <div className="space-y-4 p-5 sm:p-6">
                 {facturaE && <h2 className="text-xl font-bold text-neutral-800">Datos del cliente para la factura electrónica</h2>}

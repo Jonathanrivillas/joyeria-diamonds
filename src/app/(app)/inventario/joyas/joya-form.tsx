@@ -68,7 +68,7 @@ export function JoyaForm({
 
   return (
     <Card padding="lg">
-      <form key={formKey} action={accion} className="space-y-5">
+      <form key={formKey} action={accion} className="space-y-5 [&>h2]:!mt-0">
         <h2 className="text-2xl font-bold">Registrar joya preciosa</h2>
         {estado?.ok && <Alert tone="success">{estado.ok}</Alert>}
 
