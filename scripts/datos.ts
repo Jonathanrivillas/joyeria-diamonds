@@ -78,6 +78,7 @@ async function borrarMovimientos() {
 //  CERO
 // ======================================================================
 async function dejarEnCero() {
+  console.log("Borrando ventas, gastos, movimientos y usuarios…");
   const admin = await db.usuario.findUnique({ where: { email: ADMIN_QUE_QUEDA } });
   if (!admin || admin.rol !== "ADMIN" || !admin.activo) throw new Error(`No hay un administrador activo con el correo ${ADMIN_QUE_QUEDA}. Cambie ADMIN_QUE_QUEDA.`);
   await borrarMovimientos();
@@ -93,7 +94,9 @@ async function dejarEnCero() {
 //  PRUEBA
 // ======================================================================
 async function cargarPrueba() {
+  console.log("1/3 Borrando ventas, gastos y movimientos anteriores…");
   await borrarMovimientos();
+  console.log("2/3 Preparando locales, usuarios, tipos de pieza y proveedores…");
 
   // ---- Locales (si no hay, se crean) ----
   let locales = await db.local.findMany({ orderBy: { id: "asc" } });
@@ -157,6 +160,7 @@ async function cargarPrueba() {
 
   for (const [li, local] of locales.slice(0, 2).entries()) {
     const vendedor = vendedores[li];
+    console.log(`3/3 ${local.nombre}: creando ventas, gastos, joyas y arqueos…`);
     const factor = li === 0 ? 1 : 0.75;
     const objetivo = cats.map((c) => {
       const [p, q] = base(c);
@@ -344,7 +348,7 @@ async function main() {
     process.stdout.write(`\rEmpieza en ${s} s… (Ctrl + C para cancelar) `);
     await new Promise((r) => setTimeout(r, 1000));
   }
-  process.stdout.write("\n");
+  process.stdout.write("\rEmpezó. Esto tarda uno o dos minutos; no cierre la terminal.\n");
   if (modo === "CERO") await dejarEnCero();
   else await cargarPrueba();
 }
