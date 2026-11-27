@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/inventario";
 import { parseGramos } from "@/lib/format";
+import { mensajeSeguro } from "@/lib/errores";
 import { auditar } from "@/lib/auditoria";
 
 export type EstadoTraslado = { error?: string; ok?: string } | undefined;
@@ -89,7 +90,7 @@ export async function crearTraslado(
       );
     });
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "crearTraslado") };
   }
   revalidatePath("/", "layout");
   return { ok: `Listo. El traslado de ${cat.nombre} quedó guardado.` };

@@ -1,7 +1,7 @@
 import { Paperclip, Ban, History, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
-import { aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
+import { aISO, finDia, inicioDia, rangoDias } from "@/lib/fechas";
 import { cop, cuando, plural, TIPOS_GASTO } from "@/lib/format";
 import { rangoActivo, rangosRapidos } from "@/lib/rangos";
 import {
@@ -31,8 +31,10 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
   const s = await requirePermiso("gastos");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
-  const desde = sp.desde ? parseFechaISO(sp.desde) : hoy;
-  const hasta = sp.hasta ? parseFechaISO(sp.hasta) : hoy;
+  // Como máximo un año a la vez; fechas al revés se intercambian.
+  const rango = rangoDias(sp.desde ?? aISO(hoy), sp.hasta ?? sp.desde ?? aISO(hoy));
+  const desde = inicioDia(rango.desde);
+  const hasta = inicioDia(rango.hasta);
 
   const [gastos, proveedores] = await Promise.all([
     db.gasto.findMany({

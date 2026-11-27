@@ -5,11 +5,12 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireSesion, exigirPermiso, localParaOperar } from "@/lib/session";
 import { puedeVer } from "@/lib/permisos";
-
-const SIN_PERMISO_ARQUEO = "No tiene permiso para hacer arqueos. Pídaselo al administrador.";
 import { registrarMovimiento } from "@/lib/inventario";
 import { auditar } from "@/lib/auditoria";
+import { ErrorUsuario, mensajeSeguro } from "@/lib/errores";
 import { z } from "zod";
+
+const SIN_PERMISO_ARQUEO = "No tiene permiso para hacer arqueos. Pídaselo al administrador.";
 
 function estadoDe(
   pS: number,
@@ -28,36 +29,38 @@ export async function iniciarArqueo(form: FormData) {
   const s = await exigirPermiso("arqueo");
   const localId = localParaOperar(s, Number(form.get("localId")) || null);
 
-  const abierto = await db.arqueo.findFirst({
-    where: { localId, estado: "ABIERTO" },
-  });
-  if (abierto) redirect(`/arqueo/${abierto.id}`);
+  // Se bloquea la fila del local: con un doble clic (o dos personas a la vez) se abría dos veces.
+  const arqueoId = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Local" WHERE id = ${localId} FOR UPDATE`;
+    const abierto = await tx.arqueo.findFirst({ where: { localId, estado: "ABIERTO" } });
+    if (abierto) return abierto.id;
 
-  const [categorias, existencias] = await Promise.all([
-    db.categoria.findMany({
-      where: { activa: true, esServicio: false },
-      orderBy: { orden: "asc" },
-    }),
-    db.existencia.findMany({ where: { localId } }),
-  ]);
-  const ex = new Map(existencias.map((e) => [e.categoriaId, e]));
-  const totalSis = existencias.reduce((a, e) => a + e.pesoCg, 0);
+    const [categorias, existencias] = await Promise.all([
+      // Las joyas preciosas no se cuentan por gramos aquí: cada una tiene su código en su página.
+      tx.categoria.findMany({ where: { activa: true, esServicio: false, porPieza: false }, orderBy: { orden: "asc" } }),
+      tx.existencia.findMany({ where: { localId } }),
+    ]);
+    const ex = new Map(existencias.map((e) => [e.categoriaId, e]));
+    // El total del sistema es la suma de lo que se va a contar (no de categorías inactivas).
+    const totalSis = categorias.reduce((a, c) => a + (ex.get(c.id)?.pesoCg ?? 0), 0);
 
-  const arqueo = await db.arqueo.create({
-    data: {
-      localId,
-      usuarioId: s.id,
-      pesoSistemaCg: totalSis,
-      detalles: {
-        create: categorias.map((c) => ({
-          categoriaId: c.id,
-          pesoSistemaCg: ex.get(c.id)?.pesoCg ?? 0,
-          cantidadSistema: ex.get(c.id)?.cantidad ?? 0,
-        })),
+    const arqueo = await tx.arqueo.create({
+      data: {
+        localId,
+        usuarioId: s.id,
+        pesoSistemaCg: totalSis,
+        detalles: {
+          create: categorias.map((c) => ({
+            categoriaId: c.id,
+            pesoSistemaCg: ex.get(c.id)?.pesoCg ?? 0,
+            cantidadSistema: ex.get(c.id)?.cantidad ?? 0,
+          })),
+        },
       },
-    },
+    });
+    return arqueo.id;
   });
-  redirect(`/arqueo/${arqueo.id}`);
+  redirect(`/arqueo/${arqueoId}`);
 }
 
 const ConteoSchema = z.object({
@@ -88,10 +91,10 @@ async function guardar(
     where: { id: input.arqueoId },
     include: { detalles: true },
   });
-  if (!arqueo) throw new Error("Arqueo no encontrado");
-  if (arqueo.estado !== "ABIERTO") throw new Error("El arqueo ya está cerrado");
+  if (!arqueo) throw new ErrorUsuario("No se encontró ese arqueo. Vuelva a la lista de arqueos.");
+  if (arqueo.estado !== "ABIERTO") throw new ErrorUsuario("Este arqueo ya se terminó.");
   if (s.rol !== "ADMIN" && arqueo.localId !== s.localId)
-    throw new Error("Sin permiso");
+    throw new ErrorUsuario("Este arqueo es de otro local.");
 
   const mapa = new Map(input.detalles.map((d) => [d.id, d]));
   let totalCont = 0;
@@ -133,7 +136,7 @@ export async function guardarConteo(
   try {
     await guardar(s, input);
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "guardarConteo") };
   }
   revalidatePath(`/arqueo/${input.arqueoId}`);
   return { ok: "Guardado. Puede salir y continuar el arqueo más tarde." };
@@ -161,34 +164,69 @@ export async function cerrarArqueo(
   }
   try {
     await guardar(s, input);
-    await db.$transaction(
-      async (tx) => {
-        const arqueo = await tx.arqueo.findUniqueOrThrow({
-          where: { id: input.arqueoId },
-          include: { detalles: true },
+    await db.$transaction(async (tx) => {
+      // Candado: solo un cierre puede pasar el arqueo de ABIERTO a CERRADO (evita aplicar los
+      // ajustes dos veces con un doble clic).
+      const tomado = await tx.arqueo.updateMany({
+        where: { id: input.arqueoId, estado: "ABIERTO" },
+        data: { estado: "CERRADO", ajustesAplicados: aplicarAjustes },
+      });
+      if (tomado.count === 0) throw new ErrorUsuario("Este arqueo ya se terminó.");
+
+      const arqueo = await tx.arqueo.findUniqueOrThrow({
+        where: { id: input.arqueoId },
+        include: { detalles: { include: { categoria: true } } },
+      });
+      // Se revisa con lo guardado en la base, no con lo que mandó la pantalla: una fila sin contar
+      // se habría ajustado a 0.
+      if (arqueo.detalles.some((d) => d.pesoContadoCg === null || d.cantidadContada === null))
+        throw new ErrorUsuario("Falta revisar algunas categorías antes de terminar.");
+
+      // "Sistema" al cerrar = saldo ACTUAL (foto de apertura + todo lo que se vendió, ingresó o
+      // trasladó mientras contaban). Antes se comparaba con la foto, y una venta hecha durante el
+      // arqueo se descontaba dos veces al aplicar los ajustes.
+      let totalSis = 0;
+      let totalCont = 0;
+      for (const d of arqueo.detalles) {
+        await tx.$queryRaw`SELECT id FROM "Existencia" WHERE "localId" = ${arqueo.localId} AND "categoriaId" = ${d.categoriaId} FOR UPDATE`;
+        const ex = await tx.existencia.findUnique({
+          where: { localId_categoriaId: { localId: arqueo.localId, categoriaId: d.categoriaId } },
         });
-        if (aplicarAjustes) {
-          for (const d of arqueo.detalles) {
-            const dp = (d.pesoContadoCg ?? 0) - d.pesoSistemaCg;
-            const dc = (d.cantidadContada ?? 0) - d.cantidadSistema;
-            if (dp === 0 && dc === 0) continue;
-            await registrarMovimiento(tx, {
-              localId: arqueo.localId,
-              categoriaId: d.categoriaId,
-              usuarioId: s.id,
-              tipo: "AJUSTE_ARQUEO",
-              pesoCg: dp,
-              cantidad: dc,
-              referencia: `ARQ-${arqueo.id}`,
-              nota: d.observacion ?? "Ajuste por arqueo",
-              permitirNegativo: true,
-            });
-          }
+        const pS = ex?.pesoCg ?? 0;
+        const cS = ex?.cantidad ?? 0;
+        const pC = d.pesoContadoCg ?? 0;
+        const cC = d.cantidadContada ?? 0;
+        totalSis += pS;
+        totalCont += pC;
+        if (pS !== d.pesoSistemaCg || cS !== d.cantidadSistema) {
+          await tx.arqueoDetalle.update({
+            where: { id: d.id },
+            data: { pesoSistemaCg: pS, cantidadSistema: cS, estado: estadoDe(pS, cS, pC, cC) },
+          });
+          d.pesoSistemaCg = pS;
+          d.cantidadSistema = cS;
         }
-        await tx.arqueo.update({
-          where: { id: arqueo.id },
-          data: { estado: "CERRADO", ajustesAplicados: aplicarAjustes },
+        // Las joyas preciosas se ajustan pieza por pieza en su página, no por gramos.
+        if (!aplicarAjustes || d.categoria.porPieza) continue;
+        const dp = pC - pS;
+        const dc = cC - cS;
+        if (dp === 0 && dc === 0) continue;
+        await registrarMovimiento(tx, {
+          localId: arqueo.localId,
+          categoriaId: d.categoriaId,
+          usuarioId: s.id,
+          tipo: "AJUSTE_ARQUEO",
+          pesoCg: dp,
+          cantidad: dc,
+          referencia: `ARQ-${arqueo.id}`,
+          nota: d.observacion ?? "Ajuste por arqueo",
+          permitirNegativo: true,
         });
+      }
+      await tx.arqueo.update({
+        where: { id: arqueo.id },
+        data: { pesoSistemaCg: totalSis, pesoContadoCg: totalCont },
+      });
         await auditar(
           s,
           aplicarAjustes ? "ARQUEO_CERRADO_CON_AJUSTES" : "ARQUEO_CERRADO",
@@ -214,11 +252,9 @@ export async function cerrarArqueo(
           },
           tx,
         );
-      },
-      { timeout: 20000 },
-    );
+    });
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "cerrarArqueo") };
   }
   revalidatePath("/", "layout");
   redirect(`/arqueo/${input.arqueoId}`);

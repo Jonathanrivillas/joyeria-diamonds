@@ -23,6 +23,9 @@ export async function cambiarClave(
   }
   if (nueva.length < 8)
     return { error: "La contraseña nueva debe tener al menos 8 caracteres." };
+  // bcrypt solo usa los primeros 72 bytes: una clave más larga daría una falsa sensación de seguridad.
+  if (Buffer.byteLength(nueva) > 72)
+    return { error: "La contraseña nueva es muy larga (máximo 72 letras)." };
   if (nueva !== confirmar)
     return {
       error: "Las dos contraseñas nuevas no son iguales. Escríbalas otra vez.",
@@ -33,7 +36,7 @@ export async function cambiarClave(
   const actualizado = await db.usuario.update({
     where: { id: u.id },
     data: {
-      passwordHash: await bcrypt.hash(nueva, 10),
+      passwordHash: await bcrypt.hash(nueva, 12),
       debeCambiarClave: false,
       sesionVersion: { increment: 1 }, // cierra la sesión en otros equipos
     },

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO } from "@/lib/fechas";
 import { cop, fecha, hora, plural, TIPOS_GASTO } from "@/lib/format";
-import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA } from "@/lib/listas";
+import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA, leerId } from "@/lib/listas";
 import {
   Badge,
   Card,
@@ -46,8 +46,8 @@ export default async function HistorialGastosPage({ searchParams }: { searchPara
     ...(localId ? { localId } : {}),
     ...(filtroFechas(sp.desde, sp.hasta) ? { fecha: filtroFechas(sp.desde, sp.hasta) } : {}),
     ...(tipos ? { tipo: { in: tipos } } : {}),
-    ...(sp.proveedor ? { proveedorId: Number(sp.proveedor) } : {}),
-    ...(sp.usuario ? { usuarioId: Number(sp.usuario) } : {}),
+    ...(leerId(sp.proveedor) ? { proveedorId: leerId(sp.proveedor) } : {}),
+    ...(leerId(sp.usuario) ? { usuarioId: leerId(sp.usuario) } : {}),
     ...(sp.estado ? { estado: sp.estado } : {}),
     ...(q ? { justificacion: { contains: q, mode: "insensitive" as const } } : {}),
   };

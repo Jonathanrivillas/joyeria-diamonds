@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Joyería · Inventario por gramos",
-  description: "Demo de inventario, ventas, gastos y arqueo para joyería",
+  description: "Inventario, ventas, gastos y arqueo de la joyería",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

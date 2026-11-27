@@ -1,26 +1,27 @@
-# Joyería · Inventario por gramos (demo)
+# Joyería · Inventario por gramos
 
-Sistema para llevar el inventario de una joyería con 2 locales **por peso (gramos) y cantidad**, igual que la planilla en papel (Entrada / Salida / Saldo por categoría), más ventas (facturas), gastos justificados, arqueo diario y reportes.
+Sistema para llevar el inventario de una joyería con 2 locales **por peso (gramos) y cantidad**, igual que la planilla en papel (Entrada / Salida / Saldo por categoría), más ventas (facturas y factura electrónica con Alegra), gastos con recibo, arqueo diario, proveedores, joyas preciosas y reportes.
 
-## Cómo correrlo
+## Desarrollo (su computador)
 
-Requisitos: Node.js 20+.
+Requisitos: Node.js 20+ y una base PostgreSQL (Neon). Copie `.env.example` a `.env` y llénelo.
 
 ```bash
 npm install
-npm run setup      # crea la base de datos SQLite (prisma/dev.db) y carga datos de ejemplo
-npm run dev        # http://localhost:3000
+npx prisma migrate dev     # crea/actualiza las tablas
+npm run dev                # http://localhost:3000
 ```
 
-Para volver a dejar los datos de ejemplo como al inicio: `npm run db:reset`.
+Datos de ejemplo (solo en la base de desarrollo; exige `DATOS_PERMITIDOS_HOSTS` en el `.env`):
 
-## Usuarios de prueba (clave `demo123`)
+- `npm run datos:prueba` — borra los movimientos y carga ventas, gastos y arqueos de ejemplo.
+- `npm run datos:cero` — deja todo en cero (conserva usuarios, locales y proveedores).
 
-| Usuario | Rol | Ve |
-|---|---|---|
-| admin@joyeria.com | Administrador | Todos los locales (consolidado o uno a uno), anulaciones, entradas, traslados, configuración |
-| vendedor1@joyeria.com | Vendedor | Solo Local 1 – Diamonds: ventas, gastos, arqueo |
-| vendedor2@joyeria.com | Vendedor | Solo Local 2 |
+Los usuarios de ejemplo (clave `demo123`) solo existen en desarrollo: el script se niega a correr en otra base.
+
+## Producción
+
+Ver **[DESPLIEGUE.md](DESPLIEGUE.md)** (VPS, Caddy, PM2, variables, día 1, respaldos y actualizaciones).
 
 ## Módulos
 
@@ -56,8 +57,7 @@ src/
 
 ## Notas técnicas
 
-- Next.js 15 (App Router, Server Actions) + Prisma + SQLite + Tailwind + Recharts.
+- Next.js 15 (App Router, Server Actions) + Prisma + PostgreSQL (Neon) + Tailwind + Recharts.
 - Pesos guardados en **centésimas de gramo** (enteros) y dinero en pesos COP enteros: no hay errores de redondeo.
 - Toda modificación de inventario pasa por `registrarMovimiento()` en [src/lib/inventario.ts](src/lib/inventario.ts), que escribe el kardex y actualiza el saldo en la misma transacción. `npm run verificar` comprueba que saldo = suma del kardex.
-- Para producción con PostgreSQL: cambiar `provider` en `prisma/schema.prisma` y `DATABASE_URL` en `.env`, y cambiar `SESSION_SECRET`.
-- Los datos de ejemplo del Local 1 reproducen la planilla (total 2.140,83 g); el Local 2 tiene ~75 % de esos valores. Incluyen 30 días de ventas, gastos y arqueos simulados.
+- Los recibos de gastos se guardan en el disco del servidor (`SOPORTES_DIR`), no en la base.

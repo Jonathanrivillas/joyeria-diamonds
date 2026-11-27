@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO, inicioDia, sumarDias } from "@/lib/fechas";
 import { fechaLarga, hora } from "@/lib/format";
-import { Button, Card, Chip, ChipGroup, EmptyState, List, ListItem, PageContainer, PageHeader, Section } from "@/components/ui";
+import { Button, Card, Chip, ChipGroup, EmptyState, List, ListItem, PageContainer, PageHeader, Section, SubmitButton } from "@/components/ui";
 import { ArqueoHoyResumen, ArqueoResultadoBadge, type ArqueoLocalHoy } from "@/components/arqueo/arqueo-estado";
 import { iniciarArqueo } from "./actions";
 
@@ -69,9 +69,9 @@ export default async function ArqueoPage({ searchParams }: { searchParams: Promi
             ) : (
               <form action={iniciarArqueo}>
                 <input type="hidden" name="localId" value={l.localId} />
-                <Button type="submit" variant={l.cerrado ? "ghost" : "primary"}>
+                <SubmitButton variant={l.cerrado ? "ghost" : "primary"} loadingText="Abriendo...">
                   {l.cerrado ? "Hacer otro" : "Empezar"}
-                </Button>
+                </SubmitButton>
               </form>
             )
           }

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { aISO } from "@/lib/fechas";
 import { cop, METODOS_PAGO, plural, REDES } from "@/lib/format";
-import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA } from "@/lib/listas";
+import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA, leerId } from "@/lib/listas";
 import { Card, DatePicker, EmptyState, List, PageContainer, PageHeader, Pagination, Select, Stat, StatPanel } from "@/components/ui";
 import { FiltrosHistorial } from "@/components/filtros/filtros-historial";
 import { VentaFila } from "@/components/ventas/venta-fila";
@@ -32,7 +32,7 @@ export default async function HistorialFacturasPage({ searchParams }: { searchPa
     ...(localId ? { localId } : {}),
     ...(filtroFechas(sp.desde, sp.hasta) ? { fecha: filtroFechas(sp.desde, sp.hasta) } : {}),
     ...(sp.metodo ? { metodoPago: sp.metodo } : {}),
-    ...(sp.vendedor ? { usuarioId: Number(sp.vendedor) } : {}),
+    ...(leerId(sp.vendedor) ? { usuarioId: leerId(sp.vendedor) } : {}),
     ...(sp.estado ? { estado: sp.estado } : {}),
     ...(sp.canal === "TIENDA" ? { canal: "TIENDA" } : sp.canal ? { canal: "REDES", red: sp.canal } : {}),
     ...(sp.fe === "si" ? { facturaElectronica: true } : sp.fe === "no" ? { facturaElectronica: false } : {}),

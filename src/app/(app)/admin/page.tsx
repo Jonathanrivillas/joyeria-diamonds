@@ -1,4 +1,4 @@
-import { Gem, History, Plus, Save, ShieldCheck, Store, UserPlus } from "lucide-react";
+import { Gem, History, KeyRound, Plus, Save, ShieldCheck, Store, UserPlus } from "lucide-react";
 import { PERMISOS, PERMISOS_DEFECTO } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { esSoporte, requireAdmin } from "@/lib/session";
@@ -8,6 +8,7 @@ import {
   Card,
   CardHeader,
   Checkbox,
+  ConfirmButton,
   Disclosure,
   Icon,
   Input,
@@ -22,6 +23,7 @@ import {
 import {
   alternarUsuario,
   crearUsuario,
+  ponerClaveTemporal,
   guardarPermisos,
   guardarCategoria,
   guardarLocal,
@@ -49,7 +51,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ]);
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer width="fluid" className="space-y-8">
       <PageHeader
         title="Administración"
         subtitle={
@@ -96,17 +98,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </p>
                   </div>
                   <StatusBadge status={u.activo ? "HABILITADO" : "INACTIVO"} />
-                  {u.id !== s.id && (
-                    <form action={alternarUsuario}>
-                      <input type="hidden" name="id" value={u.id} />
-                      <Button
-                        type="submit"
+                  {/* A los vendedores los maneja cualquier administrador; a los administradores, solo soporte. */}
+                  {u.id !== s.id && (u.rol === "VENDEDOR" || soporte) &&
+                    (u.activo ? (
+                      <ConfirmButton
+                        action={alternarUsuario}
                         size="sm"
-                        variant={u.activo ? "danger-outline" : "secondary"}
-                      >
-                        {u.activo ? "Desactivar" : "Activar"}
-                      </Button>
-                    </form>
+                        variant="danger-outline"
+                        label="Desactivar"
+                        title={`¿Desactivar a ${u.nombre}?`}
+                        message="Ya no podrá entrar al sistema (se le cierra la sesión de inmediato). Sus ventas y gastos se conservan, y lo puede volver a activar cuando quiera."
+                        confirmLabel="Sí, desactivar"
+                        fields={{ id: u.id }}
+                      />
+                    ) : (
+                      <form action={alternarUsuario}>
+                        <input type="hidden" name="id" value={u.id} />
+                        <SubmitButton size="sm" variant="secondary" loadingText="Un momento...">
+                          Activar
+                        </SubmitButton>
+                      </form>
+                    ))}
+                  {u.id !== s.id && (u.rol === "VENDEDOR" || soporte) && (
+                    <Disclosure title="Poner clave temporal (si la olvidó)" icon={KeyRound} className="basis-full">
+                      <form action={ponerClaveTemporal} className="flex flex-wrap items-end gap-3">
+                        <input type="hidden" name="id" value={u.id} />
+                        <PasswordInput label="Clave temporal" name="password" minLength={8} required containerClassName="min-w-[14rem] flex-1" hint="Mínimo 8 caracteres. Al entrar, el sistema le pedirá cambiarla." />
+                        <SubmitButton variant="secondary" loadingText="Guardando...">
+                          <Icon icon={Save} /> Guardar clave temporal
+                        </SubmitButton>
+                      </form>
+                    </Disclosure>
                   )}
                   {u.rol !== "ADMIN" && (
                     <Disclosure title="Qué pantallas puede ver" icon={ShieldCheck} className="basis-full">
@@ -147,7 +169,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   name="rol"
                   options={[
                     { value: "VENDEDOR", label: "Vendedor" },
-                    { value: "ADMIN", label: "Administrador" },
+                    ...(soporte ? [{ value: "ADMIN", label: "Administrador" }] : []),
                   ]}
                 />
                 <Select
@@ -199,13 +221,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     ) : (
                       <span />
                     )}
-                    <Button
-                      type="submit"
-                      variant={c ? "secondary" : "primary"}
-                      icon={c ? Save : Plus}
-                    >
+                    <SubmitButton variant={c ? "secondary" : "primary"} loadingText="Guardando...">
+                      <Icon icon={c ? Save : Plus} />
                       {c ? "Guardar" : "Agregar"}
-                    </Button>
+                    </SubmitButton>
                   </form>
                 ))}
               </div>
@@ -243,13 +262,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       disabled={!!l}
                       title="Prefijo de factura"
                     />
-                    <Button
-                      type="submit"
-                      variant={l ? "secondary" : "primary"}
-                      icon={l ? Save : Plus}
-                    >
+                    <SubmitButton variant={l ? "secondary" : "primary"} loadingText="Guardando...">
+                      <Icon icon={l ? Save : Plus} />
                       {l ? "Guardar" : "Agregar"}
-                    </Button>
+                    </SubmitButton>
                   </form>
                 ))}
               </div>

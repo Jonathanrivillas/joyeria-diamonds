@@ -40,7 +40,7 @@ export async function verificarSesion(
 ): Promise<Sesion | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, clave());
+    const { payload } = await jwtVerify(token, clave(), { algorithms: ["HS256"] });
     return {
       id: payload.id as number,
       nombre: payload.nombre as string,

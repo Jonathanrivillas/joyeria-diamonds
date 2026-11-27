@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BarChart3, Download } from "lucide-react";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { resumenRango } from "@/lib/consultas";
@@ -32,8 +33,9 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
   const s = await requirePermiso("reportes");
   const { localId, locales } = await getAlcance(s);
   const hoy = inicioDia(new Date());
-  const desde = inicioDia(parseFechaISO(sp.desde));
-  const hasta = finDia(parseFechaISO(sp.hasta ?? sp.desde));
+  let desde = inicioDia(parseFechaISO(sp.desde));
+  let hasta = finDia(parseFechaISO(sp.hasta ?? sp.desde));
+  if (desde > hasta) [desde, hasta] = [inicioDia(hasta), finDia(desde)];
   const unDia = aISO(desde) === aISO(hasta);
   const localesVista = localId ? locales.filter((l) => l.id === localId) : locales;
   const whereLocal = localId ? { localId } : {};
@@ -94,36 +96,43 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
   const pct = (n: number) => (totalCanal > 0 ? `${Math.round((n / totalCanal) * 100)} %` : "—");
 
   // Ganancia: solo de la parte vendida que tiene costo de compra registrado.
-  const [itemsGanancia, compras] = await Promise.all([
-    db.ventaItem.findMany({
-      where: { venta: { ...whereLocal, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } }, categoria: { esServicio: false } },
-      select: { pesoCg: true, cantidad: true, subtotal: true, costoMedida: true, costo: true, categoria: { select: { controlaPeso: true } } },
-    }),
+  // Si una línea tiene parte con costo y parte sin costo, su precio se reparte en proporción.
+  const filtroLocal = localId ? Prisma.sql`AND v."localId" = ${localId}` : Prisma.empty;
+  const [sumasGanancia, compras] = await Promise.all([
+    db.$queryRaw<{ vendidoConCosto: number | null; costo: number | null; gramosConCosto: bigint | null; vendidoTotal: bigint | null; gramosTotal: bigint | null }[]>`
+      SELECT
+        SUM(vi.subtotal * LEAST(1, COALESCE(vi."costoMedida"::float8 / NULLIF(CASE WHEN c."controlaPeso" THEN vi."pesoCg" ELSE vi.cantidad END, 0), 0))) AS "vendidoConCosto",
+        SUM(vi.costo) AS "costo",
+        SUM(CASE WHEN c."controlaPeso" THEN vi."costoMedida" ELSE 0 END) AS "gramosConCosto",
+        SUM(vi.subtotal) AS "vendidoTotal",
+        SUM(CASE WHEN c."controlaPeso" THEN vi."pesoCg" ELSE 0 END) AS "gramosTotal"
+      FROM "VentaItem" vi
+      JOIN "Venta" v ON v.id = vi."ventaId"
+      JOIN "Categoria" c ON c.id = vi."categoriaId"
+      WHERE v.estado = 'ACTIVA' AND c."esServicio" = false AND v.fecha >= ${desde} AND v.fecha <= ${hasta} ${filtroLocal}`,
     db.movimiento.aggregate({
       where: { ...whereLocal, tipo: "ENTRADA", costo: { gt: 0 }, fecha: { gte: desde, lte: hasta } },
       _sum: { costo: true, pesoCg: true },
       _count: true,
     }),
   ]);
-  const g = { vendidoConCosto: 0, costo: 0, gramosConCosto: 0, vendidoSinCosto: 0, gramosSinCosto: 0 };
-  for (const i of itemsGanancia) {
-    const medida = i.categoria.controlaPeso ? i.pesoCg : i.cantidad;
-    // Si una línea tiene parte con costo y parte sin costo, el precio se reparte en proporción.
-    const parteConCosto = medida > 0 ? Math.min(1, i.costoMedida / medida) : 0;
-    g.vendidoConCosto += i.subtotal * parteConCosto;
-    g.costo += i.costo;
-    g.vendidoSinCosto += i.subtotal * (1 - parteConCosto);
-    if (i.categoria.controlaPeso) {
-      g.gramosConCosto += i.costoMedida;
-      g.gramosSinCosto += i.pesoCg - i.costoMedida;
-    }
-  }
+  const sg = sumasGanancia[0];
+  const g = {
+    vendidoConCosto: Number(sg?.vendidoConCosto ?? 0),
+    costo: Number(sg?.costo ?? 0),
+    gramosConCosto: Number(sg?.gramosConCosto ?? 0),
+    vendidoSinCosto: Number(sg?.vendidoTotal ?? 0) - Number(sg?.vendidoConCosto ?? 0),
+    gramosSinCosto: Number(sg?.gramosTotal ?? 0) - Number(sg?.gramosConCosto ?? 0),
+  };
   const ganancia = Math.round(g.vendidoConCosto - g.costo);
   const margen = g.vendidoConCosto > 0 ? Math.round((ganancia / g.vendidoConCosto) * 100) : 0;
 
   // Gráficos: si es un solo día, se muestran los 7 días que terminan en ese día.
-  const gDesde = unDia ? sumarDias(desde, -6) : desde;
-  const nDias = Math.min(62, Math.round((inicioDia(hasta).getTime() - gDesde.getTime()) / 86400000) + 1);
+  const MAX_DIAS_GRAFICA = 62;
+  const diasRango = Math.round((inicioDia(hasta).getTime() - desde.getTime()) / 86400000) + 1;
+  const graficaRecortada = diasRango > MAX_DIAS_GRAFICA;
+  const gDesde = unDia ? sumarDias(desde, -6) : graficaRecortada ? sumarDias(inicioDia(hasta), -(MAX_DIAS_GRAFICA - 1)) : desde;
+  const nDias = Math.round((inicioDia(hasta).getTime() - gDesde.getTime()) / 86400000) + 1;
   const [ventasRango, gastosRango, itemsRango, categorias] = await Promise.all([
     db.venta.findMany({ where: { ...whereLocal, estado: "ACTIVA", fecha: { gte: gDesde, lte: hasta } }, select: { fecha: true, total: true } }),
     db.gasto.findMany({ where: { ...whereLocal, estado: "ACTIVO", fecha: { gte: gDesde, lte: hasta } }, select: { fecha: true, monto: true } }),
@@ -156,7 +165,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
   const activo = rangoActivo(rangos, desde, hasta)?.etiqueta;
 
   return (
-    <PageContainer>
+    <PageContainer width="fluid">
       <PageHeader
         title="Reportes"
         subtitle={unDia ? `Cierre del ${fechaLarga(desde).toLowerCase()}` : `Del ${fecha(desde)} al ${fecha(hasta)}`}
@@ -190,6 +199,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
                 )}
                 <Card tone={res.neto >= 0 ? "success" : "danger"} padding="sm">
                   <DataRow label="Le quedó" value={cop(res.neto)} tone={res.neto >= 0 ? "success" : "danger"} strong size="xl" className="font-normal" />
+                  <p className="mt-1 text-base text-neutral-600">Lo vendido menos lo gastado (los gastos incluyen lo que se pagó por mercancía).</p>
                 </Card>
                 <DataRow label="Oro vendido" value={`${gramos(res.gramosVendidos)} · ${res.piezasVendidas} pzs`} />
                 <DataRow label="Hay en inventario hoy" value={gramos(stock)} />
@@ -285,7 +295,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Ventas y gastos por día"/>
+          <CardHeader title="Ventas y gastos por día" description={graficaRecortada ? `Solo los últimos ${MAX_DIAS_GRAFICA} días de las fechas elegidas` : undefined} />
           <CardBody>
             <GraficoVentasGastos datos={serie.map(({ dia, ventas, gastos }) => ({ dia, ventas, gastos }))} />
           </CardBody>
@@ -300,7 +310,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Pro
 
       {!unDia && (
         <Card>
-          <CardHeader title="Día por día" />
+          <CardHeader title="Día por día" description={graficaRecortada ? `Solo los últimos ${MAX_DIAS_GRAFICA} días de las fechas elegidas` : undefined} />
           <Table>
             <thead>
               <tr>

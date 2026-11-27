@@ -22,7 +22,7 @@ export default async function EntradasPage() {
   ]);
 
   return (
-    <PageContainer>
+    <PageContainer width="fluid">
       <PageHeader
         title="Ingresar mercancía"
         back={{ href: "/inventario", label: "Volver al inventario" }}

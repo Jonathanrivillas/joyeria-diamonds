@@ -50,7 +50,8 @@ export async function registrarEntrada(
   // Compra: con proveedor el precio es obligatorio, y al revés.
   const proveedor = proveedorId ? await db.proveedor.findFirst({ where: { id: proveedorId, activo: true } }) : null;
   if (proveedorId && !proveedor) return { error: "Ese proveedor ya no está activo." };
-  if (proveedor && precio <= 0)
+  if (Number.isNaN(precio) || precio < 0) return { error: "El precio no se entiende. Escriba solo el número, ej: 350.000" };
+  if (proveedor && !(precio > 0))
     return { error: `Escriba a cómo se compró ${cat.controlaPeso ? "el gramo" : "cada pieza"}.` };
   if (!proveedor && precio > 0) return { error: "Escoja a cuál proveedor se le compró." };
   const valor = precio > 0 ? (cat.controlaPeso ? Math.round((pesoCg / 100) * precio) : precio * cantidad) : 0;

@@ -86,7 +86,8 @@ export async function resumenRango(localId: number | null, desde: Date, hasta: D
       _count: true,
     }),
     db.ventaItem.aggregate({
-      where: { venta: { ...whereLocal, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } } },
+      // Sin los trabajos de taller: "piezas vendidas" son solo piezas.
+      where: { venta: { ...whereLocal, estado: "ACTIVA", fecha: { gte: desde, lte: hasta } }, categoria: { esServicio: false } },
       _sum: { pesoCg: true, cantidad: true },
     }),
   ]);

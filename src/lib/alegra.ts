@@ -3,35 +3,54 @@
 
 const BASE = "https://api.alegra.com/api/v1";
 
+/**
+ * Alegra contestó que NO (datos inválidos, cliente mal escrito…): no se creó nada y se puede
+ * corregir y reintentar sin riesgo.
+ */
+export class AlegraRechazo extends Error {
+  constructor(mensaje: string) {
+    super(mensaje);
+    this.name = "AlegraRechazo";
+  }
+}
+
+/**
+ * Alegra no respondió a tiempo, se cortó la conexión o falló de su lado (5xx): NO se sabe si la
+ * operación se hizo. Para una factura esto significa que puede existir: reintentar a ciegas
+ * podría crear una factura duplicada ante la DIAN.
+ */
+export class AlegraSinRespuesta extends Error {
+  constructor(mensaje: string) {
+    super(mensaje);
+    this.name = "AlegraSinRespuesta";
+  }
+}
+
 function autorizacion() {
   const usuario = process.env.ALEGRA_USUARIO;
   const token = process.env.ALEGRA_TOKEN;
-  if (!usuario || !token)
-    throw new Error("Falta configurar ALEGRA_USUARIO y ALEGRA_TOKEN");
+  if (!usuario || !token) throw new AlegraRechazo("La facturación electrónica no está configurada. Avise a soporte.");
   return "Basic " + Buffer.from(`${usuario}:${token}`).toString("base64");
 }
 
-async function alegra<T>(
-  ruta: string,
-  opciones: { method?: string; body?: unknown } = {},
-): Promise<T> {
-  const res = await fetch(BASE + ruta, {
-    method: opciones.method ?? "GET",
-    headers: {
-      Authorization: autorizacion(),
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: opciones.body ? JSON.stringify(opciones.body) : undefined,
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000), // si Alegra no responde en 20 s, se marca como pendiente
-  });
-  const datos = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(
-      `Alegra (${res.status}): ${datos?.message ?? "error desconocido"}`,
-    );
+async function alegra<T>(ruta: string, opciones: { method?: string; body?: unknown } = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(BASE + ruta, {
+      method: opciones.method ?? "GET",
+      headers: { Authorization: autorizacion(), "Content-Type": "application/json", Accept: "application/json" },
+      body: opciones.body ? JSON.stringify(opciones.body) : undefined,
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (e) {
+    if (e instanceof AlegraRechazo) throw e;
+    // Tiempo agotado o red caída: no sabemos si Alegra alcanzó a procesar la petición.
+    throw new AlegraSinRespuesta(`Alegra no respondió (${(e as Error).name === "TimeoutError" ? "pasaron 20 segundos" : "sin conexión"}).`);
   }
+  const datos = await res.json().catch(() => null);
+  if (res.status >= 500) throw new AlegraSinRespuesta(`Alegra tuvo un problema de su lado (${res.status}).`);
+  if (!res.ok) throw new AlegraRechazo(`Alegra no aceptó la factura: ${datos?.message ?? `error ${res.status}`}`);
   return datos as T;
 }
 
@@ -100,6 +119,8 @@ const METODO_PAGO: Record<string, string> = {
 };
 
 export async function crearFacturaAlegra(datos: {
+  /** Número de la venta en el sistema (ej. L1-000123): va en las observaciones de la factura. */
+  referencia: string;
   clienteId: string;
   fecha: string; // "2026-11-23", en hora de Colombia
   metodoPago: string;
@@ -116,6 +137,7 @@ export async function crearFacturaAlegra(datos: {
       client: { id: Number(datos.clienteId) },
       paymentForm: "CASH", // de contado
       paymentMethod: METODO_PAGO[datos.metodoPago] ?? "CASH",
+      observations: `Venta ${datos.referencia}`,
       items: datos.items.map((i) => ({
         id: Number(i.alegraItemId),
         description: i.descripcion,

@@ -50,6 +50,19 @@ export function parseFechaISO(s: string | undefined | null): Date {
   return inicioDia(new Date());
 }
 
+/**
+ * Rango de días completos listo para consultar: si vienen al revés se intercambian, y si es más
+ * largo que `maxDias` se dejan los últimos `maxDias` (para no traer años de datos de una vez).
+ */
+export function rangoDias(desdeISO: string | undefined | null, hastaISO: string | undefined | null, maxDias = 366) {
+  let desde = parseFechaISO(desdeISO);
+  let hasta = parseFechaISO(hastaISO ?? desdeISO);
+  if (desde > hasta) [desde, hasta] = [hasta, desde];
+  const recortado = (hasta.getTime() - desde.getTime()) / DIA_MS + 1 > maxDias;
+  if (recortado) desde = sumarDias(hasta, -(maxDias - 1));
+  return { desde: inicioDia(desde), hasta: finDia(hasta), recortado };
+}
+
 /** Fecha → "2026-11-12", según el día en Colombia. */
 export function aISO(d: Date): string {
   const p = enColombia(d);

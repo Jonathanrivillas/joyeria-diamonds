@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/inventario";
 import { cop, gramos, parseCOP, parseGramos } from "@/lib/format";
 import { auditar } from "@/lib/auditoria";
+import { ErrorUsuario, mensajeSeguro } from "@/lib/errores";
 import { asegurarCategoriaJoyas, codigoAutomatico, TIPOS_JOYA } from "@/lib/joyas";
 
 export type EstadoJoya = { error?: string; ok?: string } | undefined;
@@ -36,15 +37,17 @@ export async function registrarJoya(_prev: EstadoJoya, form: FormData): Promise<
   if (descripcion.length > 120) return { error: "La descripción es muy larga (máximo 120 letras)." };
   if (codigoManual && !/^[A-Z0-9-]{2,20}$/.test(codigoManual))
     return { error: "El código solo puede tener letras, números y guiones (ej. ESM-015)." };
+  if (/^JP-d+$/.test(codigoManual))
+    return { error: "Los códigos JP-0001, JP-0002… los pone el sistema. Use otro, o deje el código vacío." };
   if (Number.isNaN(pesoCg) || pesoCg <= 0) return { error: "Escriba cuánto pesa la joya." };
   if (pesoCg > 10_000_000) return { error: "El peso es demasiado alto. Revíselo." };
-  if (precio <= 0) return { error: "Escriba el precio de venta de la joya." };
+  if (!(precio > 0)) return { error: "Escriba el precio de venta de la joya." };
   if (precio > 2_000_000_000 || costoCompra > 2_000_000_000) return { error: "El valor es demasiado alto. Revíselo." };
   if (!["COMPRA", "INVENTARIO", "OTRO"].includes(origen)) return { error: "Toque de dónde viene la joya." };
 
   const proveedor = origen === "COMPRA" && proveedorId ? await db.proveedor.findFirst({ where: { id: proveedorId, activo: true } }) : null;
   if (origen === "COMPRA" && !proveedor) return { error: "Toque a cuál proveedor se le compró." };
-  if (origen === "COMPRA" && costoCompra <= 0) return { error: "Escriba cuánto costó la joya." };
+  if (origen === "COMPRA" && !(costoCompra > 0)) return { error: "Escriba cuánto costó la joya." };
   const catOrigen =
     origen === "INVENTARIO" && categoriaOrigenId ? await db.categoria.findUnique({ where: { id: categoriaOrigenId } }) : null;
   if (origen === "INVENTARIO" && (!catOrigen || catOrigen.esServicio || catOrigen.porPieza))
@@ -88,7 +91,8 @@ export async function registrarJoya(_prev: EstadoJoya, form: FormData): Promise<
             referencia: codigo,
             nota: `Pasa a ${cat.nombre} como ${codigo}`,
           });
-          costo = costoSalida.valor;
+          const completo = catOrigen.controlaPeso ? costoSalida.medida >= pesoCg : costoSalida.medida >= 1;
+          costo = completo ? costoSalida.valor : 0;
         }
 
         await tx.pieza.update({ where: { id: pieza.id }, data: { codigo, costo } });
@@ -133,7 +137,8 @@ export async function registrarJoya(_prev: EstadoJoya, form: FormData): Promise<
       },
     );
   } catch (e) {
-    return { error: (e as Error).message };
+    if ((e as { code?: string }).code === "P2002") return { error: "Ya hay una joya con ese código. Use otro." };
+    return { error: mensajeSeguro(e, "registrarJoya") };
   }
   revalidatePath("/", "layout");
   return {
@@ -149,9 +154,10 @@ export async function editarJoya(form: FormData) {
   const id = Number(form.get("id"));
   const precio = parseCOP(String(form.get("precio") || "0"));
   const descripcion = String(form.get("descripcion") || "").trim();
+  if (!Number.isInteger(id) || id <= 0) volver("error", "Esa joya no existe.");
   const antes = await db.pieza.findUnique({ where: { id } });
   if (!antes || antes.estado !== "DISPONIBLE") volver("error", "Esa joya ya no está disponible.");
-  if (precio <= 0 || precio > 2_000_000_000) volver("error", "Escriba un precio válido.");
+  if (!(precio > 0) || precio > 2_000_000_000) volver("error", "Escriba un precio válido.");
   if (descripcion.length > 120) volver("error", "La descripción es muy larga.");
   await db.pieza.update({ where: { id }, data: { precio, descripcion } });
   await auditar(s, "JOYA_EDITADA", {
@@ -168,6 +174,7 @@ export async function moverJoya(form: FormData) {
   const s = await requireAdmin();
   const id = Number(form.get("id"));
   const destinoId = Number(form.get("destinoId"));
+  if (!Number.isInteger(id) || id <= 0) volver("error", "Esa joya no existe.");
   const p = await db.pieza.findUnique({ where: { id } });
   if (!p || p.estado !== "DISPONIBLE") volver("error", "Esa joya ya no está disponible.");
   const pieza = p!;
@@ -176,6 +183,12 @@ export async function moverJoya(form: FormData) {
 
   try {
     await db.$transaction(async (tx) => {
+      // Candado: si en este momento la están vendiendo o ya la movieron, no se mueve.
+      const tomada = await tx.pieza.updateMany({
+        where: { id: pieza.id, estado: "DISPONIBLE", localId: pieza.localId },
+        data: { localId: destinoId },
+      });
+      if (tomada.count === 0) throw new ErrorUsuario(`La joya ${pieza.codigo} acaba de venderse o de moverse. Recargue la página.`);
       const t = await tx.traslado.create({
         data: {
           origenId: pieza.localId,
@@ -208,11 +221,10 @@ export async function moverJoya(form: FormData) {
         nota: pieza.codigo,
         costo: costoSalida,
       });
-      await tx.pieza.update({ where: { id: pieza.id }, data: { localId: destinoId } });
       await auditar(s, "JOYA_TRASLADADA", { entidad: "Pieza", entidadId: pieza.id, detalle: { codigo: pieza.codigo, origenId: pieza.localId, destinoId } }, tx);
     });
   } catch (e) {
-    volver("error", (e as Error).message);
+    volver("error", mensajeSeguro(e, "moverJoya"));
   }
   revalidatePath("/", "layout");
   volver("ok", `La joya ${pieza.codigo} se movió de local.`);

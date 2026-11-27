@@ -4,6 +4,7 @@ import { cache } from "react";
 import { COOKIE_SESION, verificarSesion, type Sesion } from "./token";
 import { db } from "./db";
 import { paginaInicial, puedeVer, type Permiso } from "./permisos";
+import { ErrorUsuario } from "./errores";
 
 export const COOKIE_LOCAL = "joyeria_local";
 
@@ -88,30 +89,32 @@ export async function requireSoporte(): Promise<Sesion> {
  * - Vendedor: siempre su local.
  * - Admin: el elegido en el selector (null = todos los locales).
  */
-export async function getAlcance(s: Sesion): Promise<{
+// `cache`: el layout y la página la piden en la misma petición; así se consulta una sola vez.
+export const getAlcance = cache(async (s: Sesion): Promise<{
   localId: number | null;
   locales: { id: number; nombre: string; prefijoFactura: string }[];
-}> {
+}> => {
   const locales = await db.local.findMany({
     orderBy: { id: "asc" },
     select: { id: true, nombre: true, prefijoFactura: true },
   });
   if (s.rol !== "ADMIN") {
-    return { localId: s.localId, locales: locales.filter((l) => l.id === s.localId) };
+    // Un vendedor sin local asignado no ve nada (antes, "sin local" se leía como "todos los locales").
+    return { localId: s.localId ?? -1, locales: locales.filter((l) => l.id === s.localId) };
   }
   const c = await cookies();
   const v = c.get(COOKIE_LOCAL)?.value;
   const id = v && v !== "todos" ? Number(v) : null;
   const valido = id && locales.some((l) => l.id === id) ? id : null;
   return { localId: valido, locales };
-}
+});
 
 /** Para operaciones que necesitan un local concreto (venta, gasto, arqueo...). */
 export function localParaOperar(s: Sesion, solicitado: number | null | undefined): number {
   if (s.rol !== "ADMIN") {
-    if (!s.localId) throw new Error("Su usuario no tiene un local asignado. Pídale al administrador que lo asigne.");
+    if (!s.localId) throw new ErrorUsuario("Su usuario no tiene un local asignado. Pídale al administrador que lo asigne.");
     return s.localId;
   }
-  if (!solicitado) throw new Error("Escoja el local.");
+  if (!solicitado) throw new ErrorUsuario("Escoja el local.");
   return solicitado;
 }

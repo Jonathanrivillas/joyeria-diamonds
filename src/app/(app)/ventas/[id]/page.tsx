@@ -23,7 +23,8 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { anularVenta, reintentarFactura } from "../actions";
+import { anularVenta, reintentarFactura, resolverFacturaDudosa } from "../actions";
+import { envioColgado, mensajeVerificar } from "@/lib/factura-electronica";
 import { AutoImprimir } from "@/components/ventas/auto-imprimir";
 
 export default async function VentaDetallePage({
@@ -31,19 +32,25 @@ export default async function VentaDetallePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ nueva?: string; cambio?: string; imprimir?: string }>;
+  searchParams: Promise<{ nueva?: string; cambio?: string; imprimir?: string; ok?: string; error?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const s = await requirePermiso("vender", "facturas");
+  const ventaId = Number(id);
+  if (!Number.isInteger(ventaId) || ventaId <= 0) notFound();
   const v = await db.venta.findUnique({
-    where: { id: Number(id) },
+    where: { id: ventaId },
     include: { local: true, usuario: true, proveedor: true, items: { include: { categoria: true } } },
   });
   if (!v) notFound();
   if (s.rol !== "ADMIN" && v.localId !== s.localId) notFound();
 
   const peso = v.items.reduce((a, i) => a + i.pesoCg, 0);
+  // Un envío que se cortó a mitad se trata como "verificar" (la factura puede existir en Alegra).
+  const estadoFE = envioColgado(v) ? "VERIFICAR" : v.alegraEstado;
+  // Con factura enviada (o que puede existir) no se anula aquí: se hace con nota crédito en Alegra.
+  const conFacturaDIAN = estadoFE === "ENVIADA" || estadoFE === "ENVIANDO" || estadoFE === "VERIFICAR";
   const cambio = Number(sp.cambio) || 0;
 
   return (
@@ -54,6 +61,9 @@ export default async function VentaDetallePage({
         back={{ href: "/ventas", label: "Volver a las facturas" }}
         actions={!sp.nueva && <PrintButton />}
       />
+
+      {sp.ok && <Alert tone="success" className="no-print">{sp.ok}</Alert>}
+      {sp.error && <Alert tone="danger" className="no-print">{sp.error}</Alert>}
 
       {sp.nueva && (
         <div className="no-print space-y-4">
@@ -176,13 +186,46 @@ export default async function VentaDetallePage({
                 {v.clienteCorreo && <> · se envía a {v.clienteCorreo}</>}
               </span>
             </Alert>
-          ) : v.alegraEstado === "ENVIANDO" ? (
+          ) : estadoFE === "ENVIANDO" ? (
             <Alert tone="info" title="Enviando la factura electrónica...">
               Espere un momento y recargue la página.
             </Alert>
+          ) : estadoFE === "VERIFICAR" ? (
+            <Alert tone="warning" title="Hay que verificar esta factura en Alegra">
+              {s.rol === "ADMIN" ? (
+                <>
+                  <p>{mensajeVerificar(v.numero)}</p>
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <form action={resolverFacturaDudosa} className="space-y-2 rounded-xl bg-white/70 p-3">
+                      <input type="hidden" name="id" value={v.id} />
+                      <input type="hidden" name="existe" value="si" />
+                      <Input label="Sí está en Alegra. Su número es:" name="numero" required placeholder="Ej: FE-1234" />
+                      <SubmitButton variant="secondary" loadingText="Guardando...">
+                        <Icon icon={FileCheck} /> Guardar el número
+                      </SubmitButton>
+                    </form>
+                    <div className="space-y-2 rounded-xl bg-white/70 p-3">
+                      <p className="text-base">No está en Alegra:</p>
+                      <ConfirmButton
+                        action={resolverFacturaDudosa}
+                        variant="secondary"
+                        icon={<Icon icon={RotateCw} />}
+                        label="Enviarla de nuevo"
+                        title="¿Seguro que no está en Alegra?"
+                        message={<>Si ya existe y la envía otra vez, el cliente quedará con dos facturas ante la DIAN. Búsquela primero por “Venta {v.numero}”.</>}
+                        confirmLabel="Sí, ya revisé: enviarla"
+                        fields={{ id: v.id, existe: "no" }}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p>La venta sí quedó guardada. El administrador debe revisar la factura en Alegra.</p>
+              )}
+            </Alert>
           ) : (
             <Alert tone="warning" title="La factura electrónica no se pudo crear">
-              <p>{v.alegraError ?? "Quedó pendiente de enviar a Alegra."}</p>
+              <p>{s.rol === "ADMIN" ? v.alegraError ?? "Quedó pendiente de enviar a Alegra." : "Quedó pendiente de enviar a Alegra."}</p>
               <p className="mt-1">La venta sí quedó guardada. Puede intentarlo otra vez.</p>
               <form action={reintentarFactura} className="mt-3">
                 <input type="hidden" name="id" value={v.id} />
@@ -196,7 +239,16 @@ export default async function VentaDetallePage({
       )}
 
 
-      {s.rol === "ADMIN" && v.estado === "ACTIVA" && (
+      {s.rol === "ADMIN" && v.estado === "ACTIVA" && conFacturaDIAN && (
+        <Card padding="md" className="no-print">
+          <p className="text-base text-neutral-600">
+            Esta venta tiene factura electrónica, así que no se anula aquí: hágalo con una <strong>nota crédito en Alegra</strong>. Si la
+            pieza vuelve a la vitrina, ingrésela en Inventario → Ingresar mercancía → "No fue una compra".
+          </p>
+        </Card>
+      )}
+
+      {s.rol === "ADMIN" && v.estado === "ACTIVA" && !conFacturaDIAN && (
         <Card padding="md" className="no-print">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-base text-neutral-600">¿Se equivocó en esta factura? Puede anularla y las piezas vuelven al inventario.</p>
@@ -209,11 +261,6 @@ export default async function VentaDetallePage({
             message={
               <>
                 La venta de {cop(v.total)} quedará anulada y las piezas vuelven al inventario. Esto no se puede deshacer.
-                {v.alegraEstado === "ENVIADA" && (
-                  <strong className="mt-2 block">
-                    Esta venta tiene factura electrónica {v.alegraNumero}: después de anular, haga la nota crédito en Alegra.
-                  </strong>
-                )}
               </>
             }
               confirmLabel="Sí, anular la factura"

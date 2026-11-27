@@ -28,5 +28,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Excluye archivos estáticos e imágenes públicas (logo, ícono de la pestaña): deben verse también en el login.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)"],
+  // También /api/salud: el monitor externo la consulta sin sesión.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/salud|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)"],
 };

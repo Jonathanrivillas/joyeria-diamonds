@@ -1,5 +1,6 @@
 import { History, ShieldAlert } from "lucide-react";
 import { db } from "@/lib/db";
+import { leerPagina } from "@/lib/listas";
 import { requireAdmin } from "@/lib/session";
 import { cop, fechaHora, gramos } from "@/lib/format";
 import { Card, CardBody, CardHeader, EmptyState, PageContainer, PageHeader, Pagination, Table, Td, Th, Tr } from "@/components/ui";
@@ -21,6 +22,17 @@ const ACCIONES: Record<string, string> = {
   USUARIO_ACTUALIZADO: "Cambió un usuario o su contraseña",
   USUARIO_DESACTIVADO: "Desactivó un usuario",
   USUARIO_ACTIVADO: "Activó un usuario",
+  CLAVE_RESTABLECIDA: "Le puso una clave temporal a un usuario",
+  PERMISOS_CAMBIADOS: "Cambió lo que puede hacer un usuario",
+  JOYA_REGISTRADA: "Registró una joya preciosa",
+  JOYA_EDITADA: "Cambió una joya preciosa",
+  JOYA_TRASLADADA: "Movió una joya preciosa a otro local",
+  PROVEEDOR_CREADO: "Creó un proveedor",
+  PROVEEDOR_EDITADO: "Cambió un proveedor",
+  PROVEEDOR_DESACTIVADO: "Desactivó un proveedor",
+  PROVEEDOR_ACTIVADO: "Activó un proveedor",
+  DATOS_EN_CERO: "Dejó el sistema en cero (soporte)",
+  BASE_LISTA_PRODUCCION: "Preparó el sistema para empezar (soporte)",
 };
 
 type D = Record<string, unknown>;
@@ -52,7 +64,24 @@ function resumen(accion: string, d: D | null): string {
     case "USUARIO_ACTIVADO":
       return String(d.email ?? "");
     case "LOCAL_GUARDADO":
+    case "PROVEEDOR_DESACTIVADO":
+    case "PROVEEDOR_ACTIVADO":
       return String(d.nombre ?? "");
+    case "PROVEEDOR_CREADO":
+      return String(d.nombre ?? "");
+    case "PROVEEDOR_EDITADO":
+      return String((d.despues as D | undefined)?.nombre ?? "");
+    case "CLAVE_RESTABLECIDA":
+    case "PERMISOS_CAMBIADOS":
+      return String(d.email ?? "");
+    case "JOYA_REGISTRADA":
+      return `${d.codigo} · ${d.descripcion ?? ""} · ${gramos(Number(d.pesoCg))} · ${cop(Number(d.precio))}`;
+    case "JOYA_EDITADA": {
+      const a = (d.antes ?? {}) as D, b = (d.despues ?? {}) as D;
+      return a.precio !== b.precio ? `${d.codigo}: precio de ${cop(Number(a.precio))} a ${cop(Number(b.precio))}` : String(d.codigo ?? "");
+    }
+    case "JOYA_TRASLADADA":
+      return String(d.codigo ?? "");
     default:
       return JSON.stringify(d);
   }
@@ -60,7 +89,7 @@ function resumen(accion: string, d: D | null): string {
 
 export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   await requireAdmin();
-  const pagina = Math.max(1, Number((await searchParams).pagina) || 1);
+  const pagina = leerPagina((await searchParams).pagina);
   const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const [registros, total, fallidos] = await Promise.all([
@@ -78,7 +107,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   return (
-    <PageContainer>
+    <PageContainer width="fluid">
       <PageHeader
         title="Historial de cambios"
         subtitle="Quién hizo qué y cuándo"

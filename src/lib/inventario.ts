@@ -1,5 +1,6 @@
 import type { Tx } from "./db";
 import { gramos } from "./format";
+import { ErrorUsuario } from "./errores";
 
 export type TipoMovimiento =
   | "ENTRADA"
@@ -51,10 +52,19 @@ export async function registrarMovimiento(
     proveedorId?: number;
   }
 ): Promise<{ costoSalida: CostoMovido }> {
-  const actual = await tx.existencia.upsert({
+  // Bloqueo de la fila: si dos operaciones tocan el mismo local + tipo de pieza al mismo tiempo,
+  // la segunda espera a que la primera termine. Sin esto, ambas leían el mismo saldo y una borraba
+  // el cambio de la otra (ej. 100 g, +50 y −10 a la vez → 150 o 90 en vez de 140).
+  // 1) Crear la fila si no existe, sin chocar si otra operación la crea al mismo tiempo.
+  await tx.$executeRaw`
+    INSERT INTO "Existencia" ("localId", "categoriaId") VALUES (${m.localId}, ${m.categoriaId})
+    ON CONFLICT ("localId", "categoriaId") DO NOTHING`;
+  // 2) Bloquearla hasta que termine la transacción.
+  await tx.$queryRaw`
+    SELECT id FROM "Existencia" WHERE "localId" = ${m.localId} AND "categoriaId" = ${m.categoriaId} FOR UPDATE`;
+  // 3) Leerla ya bloqueada (valores al día).
+  const actual = await tx.existencia.findUniqueOrThrow({
     where: { localId_categoriaId: { localId: m.localId, categoriaId: m.categoriaId } },
-    create: { localId: m.localId, categoriaId: m.categoriaId, pesoCg: 0, cantidad: 0 },
-    update: {},
     include: { categoria: true },
   });
 
@@ -62,7 +72,7 @@ export async function registrarMovimiento(
   const nuevaCant = actual.cantidad + m.cantidad;
 
   if (!m.permitirNegativo && (nuevoPeso < 0 || nuevaCant < 0)) {
-    throw new Error(
+    throw new ErrorUsuario(
       `No hay suficiente ${actual.categoria.nombre} en el inventario. Solo hay ${gramos(actual.pesoCg)} y ${actual.cantidad} piezas.`
     );
   }

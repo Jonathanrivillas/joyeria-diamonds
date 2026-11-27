@@ -6,7 +6,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireAdmin, requireSoporte } from "@/lib/session";
+import { esSoporte, requireAdmin, requireSoporte } from "@/lib/session";
+import type { Sesion } from "@/lib/token";
+
+/** Costo de bcrypt para las claves (12: más lento de adivinar que el 10 de antes). */
+const COSTO_CLAVE = 12;
 import { limpiarPermisos } from "@/lib/permisos";
 
 /**
@@ -96,74 +100,70 @@ export async function crearUsuario(form: FormData) {
   if (password.length < 8) avisar("error", "La contraseña debe tener mínimo 8 caracteres.");
   if (password.length > 200) avisar("error", "La contraseña es demasiado larga.");
   if (rol === "VENDEDOR" && !localId) avisar("error", "Escoja el local del vendedor.");
-  if (email === s.email.toLowerCase()) avisar("error", "Ese es su propio correo. Para cambiar su clave use «Mi clave».");
+  if (email === s.email.toLowerCase()) avisar("error", "Ese es su propio correo. Para cambiar su clave use «Mi cuenta».");
 
-  const existia = await db.usuario.findUnique({
-    where: { email },
-    select: { rol: true, localId: true },
+  // Solo CREA. Antes, un correo que ya existía se "actualizaba" en silencio (clave y rol nuevos):
+  // así un administrador podía quedarse con la cuenta de otro administrador o de soporte.
+  const existe = await db.usuario.findUnique({ where: { email }, select: { nombre: true } });
+  if (existe)
+    avisar("error", `Ya existe un usuario con ese correo (${existe.nombre}). Para darle una clave nueva use «Poner clave temporal» en su fila.`);
+  if (rol === "ADMIN" && !esSoporte(s)) avisar("error", "Solo soporte puede crear administradores.");
+
+  const u = await db.usuario.create({
+    data: { nombre, email, rol, localId, permisos, passwordHash: await bcrypt.hash(password, COSTO_CLAVE), debeCambiarClave: true },
   });
-  const u = await db.usuario.upsert({
-    where: { email },
-    create: {
-      nombre,
-      email,
-      rol,
-      localId,
-      permisos,
-      passwordHash: await bcrypt.hash(password, 10),
-      debeCambiarClave: true,
-    },
-    update: {
-      nombre,
-      rol,
-      localId,
-      permisos,
-      passwordHash: await bcrypt.hash(password, 10),
-      activo: true,
-      sesionVersion: { increment: 1 },
-      debeCambiarClave: true,
-    },
-  });
-  await auditar(s, existia ? "USUARIO_ACTUALIZADO" : "USUARIO_CREADO", {
+  await auditar(s, "USUARIO_CREADO", {
     entidad: "Usuario",
     entidadId: u.id,
-    detalle: {
-      email,
-      rol,
-      localId,
-      permisos,
-      ...(existia
-        ? { rolAntes: existia.rol, localIdAntes: existia.localId }
-        : {}),
-      claveAsignada: true, // nunca se guarda la contraseña, solo que se cambió
-    },
+    detalle: { email, rol, localId, permisos, claveAsignada: true }, // nunca se guarda la contraseña
   });
   revalidatePath("/admin");
-  avisar(
-    "ok",
-    existia
-      ? `Se actualizó a ${nombre}: entra con ${email} y la contraseña que escribió (al entrar debe cambiarla).`
-      : `Listo, se creó a ${nombre}. Entra con ${email} y la contraseña que escribió (al entrar debe cambiarla).`,
-  );
+  avisar("ok", `Listo, se creó a ${nombre}. Entra con ${email} y la contraseña que escribió (al entrar debe cambiarla).`);
+}
+
+/**
+ * ¿Puede este administrador cambiar a este usuario? A los vendedores, cualquier administrador.
+ * A otros administradores y a las cuentas de soporte, solo soporte (si no, un administrador podría
+ * desactivar o quedarse con la cuenta de soporte).
+ */
+function puedeAdministrar(s: Sesion, u: { id: number; rol: string; email: string }) {
+  if (u.id === s.id) return false;
+  if (u.rol === "VENDEDOR") return true;
+  return esSoporte(s);
+}
+
+/** Le pone una clave temporal a un usuario que la olvidó; al entrar debe cambiarla. */
+export async function ponerClaveTemporal(form: FormData) {
+  const s = await requireAdmin();
+  const avisar = (clave: "ok" | "error", msg: string) => redirect(`/admin?${clave}=${encodeURIComponent(msg)}#usuarios`);
+  const id = Number(form.get("id"));
+  const password = String(form.get("password") || "");
+  const u = Number.isInteger(id) && id > 0 ? await db.usuario.findUnique({ where: { id } }) : null;
+  if (!u) avisar("error", "Ese usuario no existe.");
+  if (!puedeAdministrar(s, u!)) avisar("error", "No puede cambiar la clave de ese usuario.");
+  if (password.length < 8) avisar("error", "La clave temporal debe tener mínimo 8 caracteres.");
+  if (password.length > 200) avisar("error", "La clave es demasiado larga.");
+  await db.usuario.update({
+    where: { id },
+    data: { passwordHash: await bcrypt.hash(password, COSTO_CLAVE), debeCambiarClave: true, sesionVersion: { increment: 1 } },
+  });
+  await db.intentoLogin.deleteMany({ where: { email: u!.email } }); // la desbloquea si estaba bloqueada
+  await auditar(s, "CLAVE_RESTABLECIDA", { entidad: "Usuario", entidadId: id, detalle: { email: u!.email } });
+  revalidatePath("/admin");
+  avisar("ok", `Listo. ${u!.nombre} entra con la clave temporal que escribió y el sistema le pedirá cambiarla.`);
 }
 
 export async function alternarUsuario(form: FormData) {
   const s = await requireAdmin();
+  const avisar = (clave: "ok" | "error", msg: string) => redirect(`/admin?${clave}=${encodeURIComponent(msg)}#usuarios`);
   const id = Number(form.get("id"));
-  if (id === s.id) return;
-  const u = await db.usuario.findUnique({ where: { id } });
-  if (!u) return;
-  await db.usuario.update({
-    where: { id },
-    data: { activo: !u.activo, sesionVersion: { increment: 1 } },
-  });
-  await auditar(s, u.activo ? "USUARIO_DESACTIVADO" : "USUARIO_ACTIVADO", {
-    entidad: "Usuario",
-    entidadId: id,
-    detalle: { email: u.email },
-  });
-
+  const u = Number.isInteger(id) && id > 0 ? await db.usuario.findUnique({ where: { id } }) : null;
+  if (!u) avisar("error", "Ese usuario no existe.");
+  if (!puedeAdministrar(s, u!)) avisar("error", u!.id === s.id ? "No puede desactivar su propio usuario." : "Solo soporte puede activar o desactivar administradores.");
+  await db.usuario.update({ where: { id }, data: { activo: !u!.activo, sesionVersion: { increment: 1 } } });
+  await auditar(s, u!.activo ? "USUARIO_DESACTIVADO" : "USUARIO_ACTIVADO", { entidad: "Usuario", entidadId: id, detalle: { email: u!.email } });
   revalidatePath("/admin");
+  avisar("ok", u!.activo ? `${u!.nombre} quedó desactivado: ya no puede entrar.` : `${u!.nombre} puede volver a entrar.`);
 }
 
 /** Qué pantallas puede ver un vendedor. Aplica de inmediato (la sesión se revisa en cada página). */

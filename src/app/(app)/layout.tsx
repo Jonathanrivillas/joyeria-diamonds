@@ -3,7 +3,7 @@ import { requireSesion, getAlcance } from "@/lib/session";
 import { LETRAS } from "@/lib/permisos";
 import { Sidebar } from "@/components/layout/sidebar";
 import { LocalSelector } from "@/components/layout/local-selector";
-import { Button } from "@/components/ui";
+import { Button, Icon, SubmitButton } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -40,9 +40,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Button>
             </span>
             <form action={logout}>
-              <Button type="submit" variant="secondary" icon={LogOut}>
+              <SubmitButton variant="secondary" loadingText="Saliendo...">
+                <Icon icon={LogOut} />
                 Salir
-              </Button>
+              </SubmitButton>
             </form>
           </div>
         </header>

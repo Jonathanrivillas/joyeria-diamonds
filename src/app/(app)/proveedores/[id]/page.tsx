@@ -24,6 +24,7 @@ import {
   Stat,
   StatPanel,
   StatusBadge,
+  ConfirmButton,
   SubmitButton,
   cn,
 } from "@/components/ui";
@@ -205,7 +206,7 @@ export default async function ProveedorDetallePage({
   }
 
   return (
-    <PageContainer className="space-y-6">
+    <PageContainer width="fluid" className="space-y-6">
       <PageHeader title={p.nombre} back={{ href: "/proveedores", label: "Volver a Proveedores" }} actions={<StatusBadge status={p.activo ? "HABILITADO" : "INACTIVO"} />} />
 
       {sp.ok && <Alert tone="success">{sp.ok}</Alert>}
@@ -290,12 +291,24 @@ export default async function ProveedorDetallePage({
               ? "Si ya no le compran, desactívelo: deja de aparecer para escoger, pero su historial se conserva."
               : "Este proveedor está inactivo: no aparece para escoger."}
           </p>
-          <form action={alternarProveedor}>
-            <input type="hidden" name="id" value={p.id} />
-            <SubmitButton variant={p.activo ? "danger-outline" : "secondary"} loadingText="Un momento...">
-              {p.activo ? "Desactivar" : "Activar"}
-            </SubmitButton>
-          </form>
+          {p.activo ? (
+            <ConfirmButton
+              action={alternarProveedor}
+              fields={{ id: p.id }}
+              variant="danger-outline"
+              label="Desactivar"
+              title={`¿Desactivar a ${p.nombre}?`}
+              message="Deja de aparecer para escoger en entradas y gastos. Su historial se conserva y lo puede volver a activar."
+              confirmLabel="Sí, desactivar"
+            />
+          ) : (
+            <form action={alternarProveedor}>
+              <input type="hidden" name="id" value={p.id} />
+              <SubmitButton variant="secondary" loadingText="Un momento...">
+                Activar
+              </SubmitButton>
+            </form>
+          )}
         </Card>
       </div>
     </PageContainer>

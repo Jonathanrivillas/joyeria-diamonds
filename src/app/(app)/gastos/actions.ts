@@ -1,12 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { put } from "@vercel/blob";
 import { detectarTipoArchivo, TAMANO_MAXIMO } from "@/lib/archivos";
+import { borrarSoporte, guardarSoporte } from "@/lib/soportes";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSesion, requireAdmin, localParaOperar } from "@/lib/session";
 import { parseCOP, TIPOS_GASTO } from "@/lib/format";
+import { mensajeSeguro } from "@/lib/errores";
 import { auditar } from "@/lib/auditoria";
 import { puedeVer } from "@/lib/permisos";
 
@@ -19,7 +19,7 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
   try {
     localId = localParaOperar(s, Number(form.get("localId")) || null);
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "gastos: local") };
   }
   const tipo = String(form.get("tipo") || "");
   const monto = parseCOP(String(form.get("monto") || ""));
@@ -48,18 +48,22 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
     if (!tipo) {
       return { error: "Ese archivo no es una foto ni un PDF. Tome la foto otra vez o escoja otra imagen." };
     }
-    // Nombre aleatorio: nadie puede adivinar la dirección de otro recibo.
-    const subido = await put(`soportes/${localId}/${randomUUID()}.${tipo.ext}`, Buffer.from(bytes), {
-      access: "public",
-      contentType: tipo.mime,
-      addRandomSuffix: true,
-    });
-    soporte = subido.url;
+    // Se guarda en el disco del servidor con un nombre al azar (ver src/lib/soportes.ts).
+    try {
+      soporte = await guardarSoporte(localId, bytes, tipo.ext);
+    } catch (e) {
+      return { error: mensajeSeguro(e, "registrarGasto: guardar recibo") };
+    }
   }
 
-  await db.gasto.create({
-    data: { localId, usuarioId: s.id, tipo, monto, justificacion, soporte, proveedorId },
-  });
+  try {
+    await db.gasto.create({
+      data: { localId, usuarioId: s.id, tipo, monto, justificacion, soporte, proveedorId },
+    });
+  } catch (e) {
+    if (soporte) await borrarSoporte(soporte); // que no quede una foto sin gasto
+    return { error: mensajeSeguro(e, "registrarGasto") };
+  }
   revalidatePath("/", "layout");
   return { ok: "Listo, el gasto quedó guardado. Puede anotar otro si necesita." };
 }
@@ -68,7 +72,7 @@ export async function registrarGasto(_prev: EstadoGasto, form: FormData): Promis
 export async function anularGasto(form: FormData) {
   const s = await requireAdmin();
   const id = Number(form.get("id"));
-  const motivo = String(form.get("motivo") || "").trim();
+  const motivo = String(form.get("motivo") || "").trim().slice(0, 300);
   if (!Number.isInteger(id) || !motivo) return;
 
   await db.$transaction(async (tx) => {

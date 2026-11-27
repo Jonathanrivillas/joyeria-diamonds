@@ -13,14 +13,16 @@ export default async function NuevaVentaPage({ searchParams }: { searchParams: P
   const pesoInicial = sp.peso && /^\d{1,6}([.,]\d{1,2})?$/.test(sp.peso) ? sp.peso : undefined;
   const s = await requirePermiso("vender");
   const { localId, locales } = await getAlcance(s);
+  // La vendedora solo recibe el inventario de su local; el administrador, el de todos (puede escoger local).
+  const soloSuLocal = s.rol === "ADMIN" ? {} : { localId: s.localId ?? -1 };
   const [categorias, existencias, precio, proveedores, joyas] = await Promise.all([
     db.categoria.findMany({ where: { activa: true }, orderBy: { orden: "asc" } }),
-    db.existencia.findMany(),
+    db.existencia.findMany({ where: soloSuLocal }),
     precioDelDia(),
     db.proveedor.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
     // Joyas preciosas disponibles (se venden una por una por su código).
     db.pieza.findMany({
-      where: { estado: "DISPONIBLE" },
+      where: { estado: "DISPONIBLE", ...soloSuLocal },
       orderBy: { codigo: "asc" },
       select: { id: true, codigo: true, tipo: true, descripcion: true, pesoCg: true, precio: true, localId: true, categoriaId: true },
     }),

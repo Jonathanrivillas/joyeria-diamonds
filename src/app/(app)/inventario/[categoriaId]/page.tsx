@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { History } from "lucide-react";
 import { db } from "@/lib/db";
+import { leerId } from "@/lib/listas";
 import { requirePermiso, getAlcance } from "@/lib/session";
 import { gramos, entero, fechaHora, TIPOS_MOVIMIENTO } from "@/lib/format";
 import { Card, EmptyState, PageContainer, PageHeader, Table, Td, Th, Tr, cn } from "@/components/ui";
@@ -19,7 +20,9 @@ export default async function KardexPage({ params }: { params: Promise<{ categor
   const { categoriaId } = await params;
   const s = await requirePermiso("inventario");
   const { localId } = await getAlcance(s);
-  const cat = await db.categoria.findUnique({ where: { id: Number(categoriaId) } });
+  const catId = leerId(categoriaId);
+  if (!catId) notFound();
+  const cat = await db.categoria.findUnique({ where: { id: catId } });
   if (!cat) notFound();
 
   const whereLocal = localId ? { localId } : {};
@@ -44,7 +47,7 @@ export default async function KardexPage({ params }: { params: Promise<{ categor
   });
 
   return (
-    <PageContainer>
+    <PageContainer width="fluid">
       <PageHeader
         title={`Movimientos de ${cat.nombre}`}
         subtitle={`Hay ahora: ${cat.controlaPeso ? gramos(saldo._sum.pesoCg ?? 0) + " · " : ""}${entero(saldo._sum.cantidad ?? 0)} piezas`}

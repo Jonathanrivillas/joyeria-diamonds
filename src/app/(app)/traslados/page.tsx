@@ -19,7 +19,7 @@ export default async function TrasladosPage() {
   ]);
 
   return (
-    <PageContainer>
+    <PageContainer width="fluid">
       <PageHeader
         title="Traslados"
         help="Use esto para llevar piezas de un local al otro. Se descuentan del local que las envía y se suman al que las recibe."

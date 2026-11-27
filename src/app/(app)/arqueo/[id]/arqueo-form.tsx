@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, X, Save, Lock, RotateCcw } from "lucide-react";
-import { gramos, parseGramos } from "@/lib/format";
+import { AlertTriangle, Check, X, Save, Lock, RotateCcw } from "lucide-react";
+import { gramos, parseGramos, plural } from "@/lib/format";
 import {
   ActionBar,
   Alert,
@@ -14,6 +14,8 @@ import {
   GramsInput,
   Input,
   LeaveGuard,
+  Modal,
+  ModalActions,
   ProgressBar,
   Stat,
   StatPanel,
@@ -82,6 +84,14 @@ export function ArqueoForm({
   const [msg, setMsg] = useState<{ error?: string; ok?: string }>({});
   const [obs, setObs] = useState(observacion);
   const [aplicar, setAplicar] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const terminar = () => {
+    setAccion("cerrar");
+    start(async () => {
+      const r = await cerrarArqueo(input(), aplicar);
+      if (r?.error) setMsg(r);
+    });
+  };
   const [filas, setFilas] = useState<Fila[]>(
     detalles.map((d) => {
       if (d.pesoContadoCg === null || d.cantidadContada === null) return { modo: null, peso: "", cant: "", obs: d.observacion };
@@ -321,17 +331,36 @@ export function ArqueoForm({
           disabled={pendiente || faltan > 0}
           loading={pendiente && accion === "cerrar"}
           loadingText="Terminando..."
-          onClick={() => {
-            setAccion("cerrar");
-            start(async () => {
-              const r = await cerrarArqueo(input(), aplicar);
-              if (r?.error) setMsg(r);
-            });
-          }}
+          onClick={() => (aplicar && conDiferencia > 0 ? setConfirmando(true) : terminar())}
         >
           {faltan > 0 ? `Faltan ${faltan} por revisar` : "Terminar el arqueo"}
         </Button>
       </ActionBar>
+
+      {/* Corregir el inventario cambia el saldo del sistema: se pide confirmación. */}
+      <Modal
+        open={confirmando}
+        onClose={() => setConfirmando(false)}
+        title="¿Corregir el inventario?"
+        description={`El inventario de ${plural(conDiferencia, "categoría", "categorías")} quedará igual a lo que usted contó. Esto no se puede deshacer.`}
+        icon={AlertTriangle}
+        tone="danger"
+      >
+        <ModalActions>
+          <Button variant="secondary" onClick={() => setConfirmando(false)}>
+            No, cancelar
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setConfirmando(false);
+              terminar();
+            }}
+          >
+            Sí, corregir y terminar
+          </Button>
+        </ModalActions>
+      </Modal>
     </div>
   );
 }

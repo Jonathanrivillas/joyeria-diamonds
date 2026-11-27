@@ -53,6 +53,12 @@ jobs:
           URL_PRUEBA: ${{ secrets.RESPALDO_PRUEBA_URL }}
         run: |
           BIN=/usr/lib/postgresql/18/bin
+          # pg_restore --clean BORRA la base de destino: jamás puede ser la de producción.
+          servidor() { echo "$1" | sed -E 's#^[a-z]+://[^@]*@([^/:?]+).*#\1#; s#-pooler##'; }
+          if [ -z "$URL_PRUEBA" ] || [ "$(servidor "$URL_PRUEBA")" = "$(servidor "$URL_BD")" ]; then
+            echo "::error::RESPALDO_PRUEBA_URL falta o apunta al mismo servidor que producción. No se restaura."
+            exit 1
+          fi
           gpg --batch --pinentry-mode loopback --passphrase "$CLAVE" \
               --decrypt --output prueba.dump respaldo-*.dump.gpg
           $BIN/pg_restore --clean --if-exists --no-owner --no-privileges \
@@ -60,7 +66,7 @@ jobs:
           shred -u prueba.dump
 
           FALLA=0
-          for T in Usuario Local Categoria Existencia Venta VentaItem Movimiento Gasto Arqueo Auditoria; do
+          for T in Usuario Local Categoria Existencia Venta VentaItem Movimiento Gasto Arqueo Auditoria Pieza Proveedor PrecioGramo Traslado; do
             O=$($BIN/psql "$URL_BD" -tAc "select count(*) from \"$T\"")
             C=$($BIN/psql "$URL_PRUEBA" -tAc "select count(*) from \"$T\"")
             echo "$T: producción $O · copia $C"

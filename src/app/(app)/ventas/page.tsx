@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { RangoFechas } from "@/components/filtros/rango-fechas";
 import { VentaFila } from "@/components/ventas/venta-fila";
+import { leerId } from "@/lib/listas";
 import { VentasTabla } from "@/components/ventas/ventas-tabla";
 
 const ESTADOS: Record<string, string> = { ACTIVA: "Vigentes", ANULADA: "Anuladas" };
@@ -45,7 +46,7 @@ export default async function VentasPage({
     ...(localId ? { localId } : {}),
     fecha: { gte: inicioDia(desde), lte: finDia(hasta) },
     ...(sp.metodo ? { metodoPago: sp.metodo } : {}),
-    ...(sp.vendedor ? { usuarioId: Number(sp.vendedor) } : {}),
+    ...(leerId(sp.vendedor) ? { usuarioId: leerId(sp.vendedor) } : {}),
     ...(sp.estado ? { estado: sp.estado } : {}),
     ...(sp.q
       ? {
@@ -54,7 +55,9 @@ export default async function VentasPage({
       : {}),
   };
 
-  const [ventas, usuarios] = await Promise.all([
+  // Los totales se calculan en la base sobre TODAS las facturas del filtro (la lista se corta en
+  // LIMITE; antes se sumaba sobre la lista cortada y en rangos grandes daba menos de lo real).
+  const [ventas, usuarios, sumaActivas, nAnuladas, pesoActivas] = await Promise.all([
     db.venta.findMany({
       where,
       orderBy: { fecha: "desc" },
@@ -62,11 +65,14 @@ export default async function VentasPage({
       include: { local: true, usuario: true, items: { include: { categoria: true } } },
     }),
     db.usuario.findMany({ orderBy: { nombre: "asc" }, ...(localId ? { where: { OR: [{ localId }, { rol: "ADMIN" }] } } : {}) }),
+    db.venta.aggregate({ where: { ...where, estado: "ACTIVA" }, _sum: { total: true }, _count: true }),
+    db.venta.count({ where: { ...where, estado: "ANULADA" } }),
+    db.ventaItem.aggregate({ where: { venta: { ...where, estado: "ACTIVA" } }, _sum: { pesoCg: true } }),
   ]);
-  const activas = ventas.filter((v) => v.estado === "ACTIVA");
-  const anuladas = ventas.length - activas.length;
-  const total = activas.reduce((a, v) => a + v.total, 0);
-  const peso = activas.reduce((a, v) => a + v.items.reduce((b, i) => b + i.pesoCg, 0), 0);
+  const activas = { length: sumaActivas._count };
+  const anuladas = nAnuladas;
+  const total = sumaActivas._sum.total ?? 0;
+  const peso = pesoActivas._sum.pesoCg ?? 0;
 
   // ---- Filtros: enlaces que conservan lo demás ----
   const actuales = { desde: aISO(desde), hasta: aISO(hasta), q: sp.q, metodo: sp.metodo, vendedor: sp.vendedor, estado: sp.estado };

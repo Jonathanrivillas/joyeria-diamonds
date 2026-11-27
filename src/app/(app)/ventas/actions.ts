@@ -9,7 +9,8 @@ import { puedeVer } from "@/lib/permisos";
 import { precioDelDia } from "@/lib/precio";
 import { registrarMovimiento, siguienteNumeroFactura } from "@/lib/inventario";
 import { auditar } from "@/lib/auditoria";
-import { facturarVenta } from "@/lib/factura-electronica";
+import { facturarVenta, resolverVerificacion } from "@/lib/factura-electronica";
+import { ErrorUsuario, mensajeSeguro } from "@/lib/errores";
 
 const ItemSchema = z.object({
   categoriaId: z.number().int().positive(),
@@ -42,7 +43,7 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
   const s = await requireSesion();
   if (!puedeVer(s, "vender")) return { error: "No tiene permiso para vender. Pídaselo al administrador." };
   const parsed = VentaSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revise los datos de la venta e intente otra vez." };
   const v = parsed.data;
 
   if (v.facturaElectronica) {
@@ -64,11 +65,16 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
   try {
     localId = localParaOperar(s, v.localId);
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "crearVenta: local") };
   }
 
   const categorias = await db.categoria.findMany({ where: { id: { in: v.items.map((i) => i.categoriaId) } } });
   const catMap = new Map(categorias.map((c) => [c.id, c]));
+  for (const i of v.items) {
+    const c = catMap.get(i.categoriaId);
+    if (!c) return { error: "Uno de los tipos de pieza ya no existe. Recargue la página y arme la venta otra vez." };
+    if (!c.activa) return { error: `"${c.nombre}" ya no se vende. Quítelo de la venta.` };
+  }
 
   // El vendedor vende al precio que puso el administrador: aquí se impone, sin importar lo que mande la pantalla.
   if (s.rol !== "ADMIN") {
@@ -78,7 +84,12 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
       if (!c || c.esServicio || c.porPieza) continue; // trabajos: el valor que se cobra; joyas: su propio precio
       i.precioGramo = c.controlaPeso ? oficial : c.precioUnidadSugerido;
       i.hechura = 0;
-      if (i.precioGramo <= 0) return { error: "El administrador todavía no ha puesto el precio del gramo de hoy." };
+      if (i.precioGramo <= 0)
+        return {
+          error: c.controlaPeso
+            ? "El administrador todavía no ha puesto el precio del gramo de hoy."
+            : `El precio por pieza de "${c.nombre}" no está configurado. Avise al administrador.`,
+        };
     }
   }
 
@@ -97,8 +108,7 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
   }
 
   const items = v.items.map((i) => {
-    const c = catMap.get(i.categoriaId);
-    if (!c) throw new Error("Categoría inválida");
+    const c = catMap.get(i.categoriaId)!;
     const pieza = c.porPieza && i.piezaId ? piezaMap.get(i.piezaId) : undefined;
     if (pieza) {
       return {
@@ -114,11 +124,11 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
       };
     }
     const subtotal = c.controlaPeso
-      ? Math.round((i.pesoCg / 100) * i.precioGramo) + i.hechura
+      ? Math.round((i.pesoCg * i.precioGramo) / 100) + i.hechura
       : i.precioGramo * i.cantidad + i.hechura;
     return { ...i, pesoCg: c.controlaPeso ? i.pesoCg : 0, subtotal, controlaPeso: c.controlaPeso, esServicio: c.esServicio, pieza: undefined };
   });
-  if (items.some((i) => i.controlaPeso && i.pesoCg <= 0)) return { error: "Indica el peso de cada pieza" };
+  if (items.some((i) => i.controlaPeso && i.pesoCg <= 0)) return { error: "Escriba el peso de cada pieza." };
   if (items.some((i) => i.esServicio && (i.subtotal <= 0 || !i.descripcion.trim())))
     return { error: "Escriba el valor y qué trabajo es en cada fabricación o reparación." };
   const total = items.reduce((a, i) => a + i.subtotal, 0);
@@ -163,8 +173,8 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
             });
         if (i.pieza) {
           // Solo si sigue disponible: evita vender la misma joya dos veces al mismo tiempo.
-          const marcada = await tx.pieza.updateMany({ where: { id: i.pieza.id, estado: "DISPONIBLE" }, data: { estado: "VENDIDA" } });
-          if (marcada.count === 0) throw new Error(`La joya ${i.pieza.codigo} ya se vendió.`);
+          const marcada = await tx.pieza.updateMany({ where: { id: i.pieza.id, estado: "DISPONIBLE", localId }, data: { estado: "VENDIDA" } });
+          if (marcada.count === 0) throw new ErrorUsuario(`La joya ${i.pieza.codigo} ya se vendió o la movieron a otro local.`);
         }
         await tx.ventaItem.create({
           data: {
@@ -190,56 +200,89 @@ export async function crearVenta(input: NuevaVentaInput): Promise<{ error?: stri
     return { id: venta.id };
 
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: mensajeSeguro(e, "crearVenta") };
   }
 }
 
+/** Vuelve a la factura con un aviso (los errores lanzados se ven en inglés y genéricos en producción). */
+const volverAFactura = (id: number, clave: "ok" | "error", msg: string) =>
+  redirect(`/ventas/${id}?${clave}=${encodeURIComponent(msg)}`);
+
 export async function anularVenta(form: FormData) {
   const s = await requireSesion();
-  if (s.rol !== "ADMIN") throw new Error("Solo el administrador puede anular facturas");
   const id = Number(form.get("id"));
+  if (!Number.isInteger(id) || id <= 0) redirect("/ventas");
+  if (s.rol !== "ADMIN") volverAFactura(id, "error", "Solo el administrador puede anular facturas.");
   const motivo = String(form.get("motivo") || "").trim();
-  if (!motivo) throw new Error("Indica el motivo de la anulación");
+  if (!motivo) volverAFactura(id, "error", "Escriba por qué anula la factura.");
+  if (motivo.length > 300) volverAFactura(id, "error", "El motivo es muy largo (máximo 300 letras).");
 
-  await db.$transaction(async (tx) => {
-    const venta = await tx.venta.findUnique({ where: { id }, include: { items: { include: { categoria: true } } } });
-    if (!venta || venta.estado === "ANULADA") throw new Error("La factura no existe o ya está anulada");
-    await tx.venta.update({
-      where: { id },
-      data: { estado: "ANULADA", motivoAnulacion: motivo, anuladaPorId: s.id, anuladaEn: new Date() },
-    });
-    await auditar(s, "VENTA_ANULADA", {
-      entidad: "Venta",
-      entidadId: id,
-      detalle: { numero: venta.numero, total: venta.total, motivo },
-    }, tx);
-    for (const i of venta.items.filter((i) => !i.categoria.esServicio)) {
-      await registrarMovimiento(tx, {
-        localId: venta.localId,
-        categoriaId: i.categoriaId,
-        usuarioId: s.id,
-        tipo: "ANULACION",
-        pesoCg: i.pesoCg,
-        cantidad: i.cantidad,
-        referencia: venta.numero,
-        nota: `Anulación: ${motivo}`,
-        // Vuelve al inventario con el mismo costo con que salió.
-        costo: { medida: i.costoMedida, valor: i.costo },
+  let error: string | null = null;
+  try {
+    await db.$transaction(async (tx) => {
+      const venta = await tx.venta.findUnique({ where: { id }, include: { items: { include: { categoria: true } } } });
+      if (!venta) throw new ErrorUsuario("Esa factura no existe.");
+      // Una factura electrónica ya enviada a la DIAN sigue valiendo aunque se anule aquí: se anula
+      // con una nota crédito en Alegra.
+      if (venta.alegraEstado === "ENVIADA" || venta.alegraEstado === "ENVIANDO" || venta.alegraEstado === "VERIFICAR")
+        throw new ErrorUsuario("Esta venta tiene (o puede tener) factura electrónica: anúlela con una nota crédito en Alegra.");
+      // Candado: solo una anulación pasa (con un doble clic se devolvía el inventario dos veces).
+      const tomada = await tx.venta.updateMany({
+        where: { id, estado: "ACTIVA" },
+        data: { estado: "ANULADA", motivoAnulacion: motivo, anuladaPorId: s.id, anuladaEn: new Date() },
       });
-      // La joya preciosa vuelve a estar disponible para la venta.
-      if (i.piezaId) await tx.pieza.update({ where: { id: i.piezaId }, data: { estado: "DISPONIBLE" } });
-    }
-  });
+      if (tomada.count === 0) throw new ErrorUsuario("Esta factura ya estaba anulada.");
+      await auditar(s, "VENTA_ANULADA", { entidad: "Venta", entidadId: id, detalle: { numero: venta.numero, total: venta.total, motivo } }, tx);
+      for (const i of venta.items.filter((i) => !i.categoria.esServicio)) {
+        await registrarMovimiento(tx, {
+          localId: venta.localId,
+          categoriaId: i.categoriaId,
+          usuarioId: s.id,
+          tipo: "ANULACION",
+          pesoCg: i.pesoCg,
+          cantidad: i.cantidad,
+          referencia: venta.numero,
+          nota: `Anulación: ${motivo}`,
+          // Vuelve al inventario con el mismo costo con que salió.
+          costo: { medida: i.costoMedida, valor: i.costo },
+        });
+        // La joya preciosa vuelve a estar disponible para la venta.
+        if (i.piezaId) await tx.pieza.update({ where: { id: i.piezaId }, data: { estado: "DISPONIBLE" } });
+      }
+    });
+  } catch (e) {
+    error = mensajeSeguro(e, "anularVenta");
+  }
   revalidatePath("/", "layout");
-  redirect(`/ventas/${id}`);
+  if (error) volverAFactura(id, "error", error);
+  volverAFactura(id, "ok", "La factura quedó anulada y las piezas volvieron al inventario.");
 }
 
-/** Vuelve a enviar a Alegra una venta cuya factura electrónica quedó pendiente o con error. */
+/** Vuelve a enviar a Alegra una venta con factura electrónica que quedó pendiente o con error. */
 export async function reintentarFactura(form: FormData) {
   const s = await exigirPermiso("vender", "facturas");
   const id = Number(form.get("id"));
-  const venta = await db.venta.findUnique({ where: { id }, select: { localId: true } });
-  if (!venta || (s.rol !== "ADMIN" && venta.localId !== s.localId)) throw new Error("La venta no existe");
-  await facturarVenta(id);
+  if (!Number.isInteger(id) || id <= 0) redirect("/ventas");
+  const venta = await db.venta.findUnique({ where: { id }, select: { localId: true, facturaElectronica: true } });
+  if (!venta || (s.rol !== "ADMIN" && venta.localId !== s.localId)) redirect("/ventas");
+  // Solo las ventas que se hicieron CON factura electrónica: una venta normal no se convierte en factura DIAN.
+  if (!venta.facturaElectronica) volverAFactura(id, "error", "Esta venta se hizo sin factura electrónica.");
+  const r = await facturarVenta(id);
   revalidatePath(`/ventas/${id}`);
+  volverAFactura(id, r.ok ? "ok" : "error", r.mensaje);
+}
+
+/**
+ * Factura en "Verificar en Alegra": el administrador ya la buscó en Alegra y dice si está
+ * (con su número) o si hay que enviarla de nuevo.
+ */
+export async function resolverFacturaDudosa(form: FormData) {
+  const s = await requireSesion();
+  const id = Number(form.get("id"));
+  if (!Number.isInteger(id) || id <= 0) redirect("/ventas");
+  if (s.rol !== "ADMIN") volverAFactura(id, "error", "Solo el administrador puede resolver esto.");
+  const existe = form.get("existe") === "si";
+  const r = await resolverVerificacion(id, existe ? { existe: true, numero: String(form.get("numero") || "") } : { existe: false });
+  revalidatePath(`/ventas/${id}`);
+  volverAFactura(id, r.ok ? "ok" : "error", r.mensaje);
 }

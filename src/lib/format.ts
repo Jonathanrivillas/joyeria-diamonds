@@ -30,22 +30,40 @@ export function entero(n: number): string {
 
 /** Convierte "5,20" / "5.20" / "1.234,56" a centésimas de gramo. */
 export function parseGramos(texto: string | null | undefined): number {
-  if (!texto) return 0;
-  let t = String(texto).trim().replace(/\s|g/gi, "");
-  if (t.includes(",")) {
-    t = t.replace(/\./g, "").replace(",", ".");
-  }
-  const n = Number(t);
-  if (!Number.isFinite(n)) return NaN;
-  return Math.round(n * 100);
+  if (!texto || !String(texto).trim()) return 0;
+  const n = leerDecimal(String(texto).replace(/\s|g/gi, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
 }
 
-/** Convierte "$ 1.250.000" a 1250000. */
+/** Convierte "$ 1.250.000" a 1250000. Acepta "1.250.000", "1,250,000" y "1250000,50" (se redondea). */
 export function parseCOP(texto: string | null | undefined): number {
-  if (!texto) return 0;
-  const t = String(texto).replace(/[^\d-]/g, "");
-  const n = Number(t);
-  return Number.isFinite(n) ? n : NaN;
+  if (!texto || !String(texto).trim()) return 0;
+  const t = String(texto).replace(/[\s$]|COP/gi, "");
+  // Separadores de miles: grupos de 3 cifras con un solo tipo de separador ("1.250.000", "1,250,000").
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(t) || /^-?\d{1,3}(,\d{3})+$/.test(t)) return Number(t.replace(/[.,]/g, ""));
+  // Pesos con centavos ("1.000,50") se redondean; "1.2345" es ambiguo y no se acepta.
+  if (/[.,]\d{3,}$/.test(t)) return NaN;
+  const n = leerDecimal(t);
+  return Number.isFinite(n) ? Math.round(n) : NaN;
+}
+
+/**
+ * Número escrito a la colombiana o a la gringa: "5,20", "5.20", "1.000,50", "1,000.50".
+ * Si tiene punto y coma, el último es el decimal. Lo que no se entienda da NaN (nunca un número inventado).
+ */
+function leerDecimal(t: string): number {
+  if (!/^-?[\d.,]+$/.test(t) || !/\d/.test(t)) return NaN;
+  const ultimo = Math.max(t.lastIndexOf("."), t.lastIndexOf(","));
+  if (ultimo === -1) return Number(t);
+  const entera = t.slice(0, ultimo);
+  const decimales = t.slice(ultimo + 1);
+  const sepDecimal = t[ultimo];
+  // Antes del decimal solo puede haber el otro separador como miles, en grupos de 3.
+  const sepMiles = sepDecimal === "," ? "." : ",";
+  if (entera.includes(sepDecimal)) return NaN; // "1,2,3" o "1.2.3": ambiguo
+  if (entera.includes(sepMiles) && !/^-?\d{1,3}([.,]\d{3})+$/.test(entera)) return NaN;
+  if (!/^\d*$/.test(decimales)) return NaN;
+  return Number(`${entera.split(sepMiles).join("") || "0"}.${decimales || "0"}`);
 }
 
 // Todas las fechas se muestran en hora de Colombia, aunque el servidor esté en otra zona.

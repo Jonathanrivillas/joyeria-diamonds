@@ -6,21 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "setup": "prisma migrate deploy && prisma db seed",
     "verificar": "tsx scripts/verificar.ts",
     "datos:prueba": "tsx --env-file=.env scripts/datos.ts --prueba --si",
     "datos:cero": "tsx --env-file=.env scripts/datos.ts --cero --si",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma migrate deploy && next build"
+    "vercel-build": "prisma migrate deploy && next build",
+    "start:vps": "next start -H 127.0.0.1 -p 3000"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
-    "@vercel/blob": "^2.9.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "jose": "^5.10.0",
@@ -43,5 +42,8 @@
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.15",
     "typescript": "5.9"
+  },
+  "engines": {
+    "node": ">=20.9"
   }
 }

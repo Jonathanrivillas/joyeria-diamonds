@@ -34,7 +34,7 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
   const pagadoA = new Map(pagado.map((x) => [x.proveedorId, { total: x._sum.monto ?? 0, n: x._count }]));
 
   return (
-    <PageContainer className="space-y-6">
+    <PageContainer width="fluid" className="space-y-6">
       <PageHeader
         title="Proveedores"
         help="Después de crear los proveedores podrá escogerlos al anotar gastos, al ingresar mercancía y en las ventas que les pagan a ellos."

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { aISO } from "@/lib/fechas";
 import { fecha, gramos, hora } from "@/lib/format";
-import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA } from "@/lib/listas";
+import { enlaceCon, filtroFechas, leerPagina, paginar, POR_PAGINA, leerId } from "@/lib/listas";
 import { Card, DatePicker, EmptyState, Icon, PageContainer, PageHeader, Pagination, Select } from "@/components/ui";
 import { FiltrosHistorial } from "@/components/filtros/filtros-historial";
 
@@ -17,9 +17,9 @@ export default async function HistorialTrasladosPage({ searchParams }: { searchP
 
   const where = {
     ...(filtroFechas(sp.desde, sp.hasta) ? { fecha: filtroFechas(sp.desde, sp.hasta) } : {}),
-    ...(sp.origen ? { origenId: Number(sp.origen) } : {}),
-    ...(sp.destino ? { destinoId: Number(sp.destino) } : {}),
-    ...(sp.categoria ? { items: { some: { categoriaId: Number(sp.categoria) } } } : {}),
+    ...(leerId(sp.origen) ? { origenId: leerId(sp.origen) } : {}),
+    ...(leerId(sp.destino) ? { destinoId: leerId(sp.destino) } : {}),
+    ...(leerId(sp.categoria) ? { items: { some: { categoriaId: leerId(sp.categoria) } } } : {}),
     ...(q ? { nota: { contains: q, mode: "insensitive" as const } } : {}),
   };
 
@@ -42,7 +42,7 @@ export default async function HistorialTrasladosPage({ searchParams }: { searchP
   const opcionesLocal = locales.map((l) => ({ value: l.id, label: l.nombre }));
 
   return (
-    <PageContainer width="lg">
+    <PageContainer width="fluid">
       <PageHeader title="Todos los traslados" back={{ href: "/traslados", label: "Volver a Traslados" }} help="El historial completo de lo que se ha movido entre locales." />
 
       <FiltrosHistorial ruta="/traslados/historial" q={q} placeholder="Buscar en las notas (ej. código de joya)…" masFiltrosActivos={masFiltros} hayFiltros={!!q || masFiltros}>

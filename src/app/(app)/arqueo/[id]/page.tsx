@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { leerId } from "@/lib/listas";
 import { requirePermiso } from "@/lib/session";
 import { fechaHora } from "@/lib/format";
 import { PageContainer, PageHeader, PrintButton } from "@/components/ui";
@@ -8,8 +9,10 @@ import { ArqueoForm } from "./arqueo-form";
 export default async function ArqueoDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await requirePermiso("arqueo");
+  const arqueoId = leerId(id);
+  if (!arqueoId) notFound();
   const a = await db.arqueo.findUnique({
-    where: { id: Number(id) },
+    where: { id: arqueoId },
     include: {
       local: true,
       usuario: true,

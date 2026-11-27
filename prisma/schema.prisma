@@ -118,6 +118,8 @@ model Movimiento {
 
   @@index([localId, fecha])
   @@index([categoriaId, fecha])
+  @@index([fecha])
+  @@index([proveedorId, tipo])
 }
 
 model Venta {
@@ -129,10 +131,11 @@ model Venta {
   clienteTipoDoc     String? // CC | NIT | CE | PP
   clienteCorreo      String?
   facturaElectronica Boolean     @default(false)
-  alegraEstado       String? // PENDIENTE | ENVIADA | ERROR
+  alegraEstado       String? // PENDIENTE | ENVIANDO | ENVIADA | ERROR (Alegra la rechazó: se puede reintentar) | VERIFICAR (Alegra no respondió: puede existir)
   alegraId           String? // id de la factura en Alegra
   alegraNumero       String? // número que muestra Alegra
   alegraError        String? // último error, para mostrarlo y reintentar
+  alegraIntentoEn    DateTime? // cuándo empezó el último envío (un ENVIANDO viejo = el proceso se cayó a mitad)
   metodoPago         String // EFECTIVO | TRANSFERENCIA | TARJETA
   canal              String      @default("TIENDA") // TIENDA | REDES
   red                String? // WHATSAPP | INSTAGRAM | FACEBOOK | OTRA (solo si canal = REDES)
@@ -152,6 +155,9 @@ model Venta {
   items              VentaItem[]
 
   @@index([localId, fecha])
+  @@index([fecha])
+  @@index([usuarioId, fecha])
+  @@index([proveedorId])
 }
 
 model VentaItem {
@@ -172,6 +178,9 @@ model VentaItem {
   pieza       Pieza?    @relation(fields: [piezaId], references: [id])
   venta       Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  @@index([ventaId])
+  @@index([piezaId])
 }
 
 model Gasto {
@@ -193,6 +202,8 @@ model Gasto {
   anuladoEn       DateTime?
 
   @@index([localId, fecha])
+  @@index([fecha])
+  @@index([proveedorId])
 }
 
 model Arqueo {
@@ -224,6 +235,8 @@ model ArqueoDetalle {
   observacion     String?
   arqueo          Arqueo    @relation(fields: [arqueoId], references: [id], onDelete: Cascade)
   categoria       Categoria @relation(fields: [categoriaId], references: [id])
+
+  @@index([arqueoId])
 }
 
 model Traslado {
@@ -247,6 +260,8 @@ model TrasladoItem {
   cantidad    Int
   traslado    Traslado  @relation(fields: [trasladoId], references: [id], onDelete: Cascade)
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  @@index([trasladoId])
 }
 
 /// Registro de intentos de inicio de sesión (para bloquear ataques de fuerza bruta).
@@ -313,4 +328,6 @@ model Pieza {
   ventaItems  VentaItem[]
 
   @@index([localId, estado])
+  @@index([categoriaId, estado])
+  @@index([proveedorId])
 }

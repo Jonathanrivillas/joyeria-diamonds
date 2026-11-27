@@ -8,3 +8,5 @@ prisma/dev.db-journal
 .env*.local
 .next-build
 .env
+# Recibos de gastos guardados en disco en desarrollo (en el VPS van en SOPORTES_DIR)
+/soportes

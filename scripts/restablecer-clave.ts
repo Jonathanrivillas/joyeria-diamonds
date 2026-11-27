@@ -24,7 +24,7 @@ async function main() {
   await db.usuario.update({
     where: { id: u.id },
     data: {
-      passwordHash: await bcrypt.hash(clave, 10),
+      passwordHash: await bcrypt.hash(clave, 12),
       debeCambiarClave: true, // al entrar, debe poner una clave nueva
       sesionVersion: { increment: 1 }, // cierra las sesiones abiertas con la clave vieja
       activo: true,

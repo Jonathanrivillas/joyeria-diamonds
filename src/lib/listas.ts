@@ -8,6 +8,13 @@ export function leerPagina(v: string | undefined): number {
   return Math.max(1, Math.floor(Number(v)) || 1);
 }
 
+/** Id que viene en la dirección (?vendedor=3). Si no es un número entero válido, undefined. */
+export function leerId(v: string | undefined | null): number | undefined {
+  if (!v || !/^d{1,9}$/.test(v)) return undefined;
+  const n = Number(v);
+  return n > 0 ? n : undefined;
+}
+
 /** Arma "/ruta?a=1&b=2" con los valores que no estén vacíos. */
 export function enlaceCon(ruta: string, params: Record<string, string | number | undefined | null>): string {
   const p = new URLSearchParams();

@@ -59,7 +59,7 @@ export default async function InicioPage() {
   }));
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer width="fluid" className="space-y-8">
       <PageHeader
         eyebrow={fechaLarga(new Date())}
         title={`${saludo()}, ${primerNombre}`}

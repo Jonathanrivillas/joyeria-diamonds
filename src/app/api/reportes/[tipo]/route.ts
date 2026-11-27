@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getSesion, getAlcance } from "@/lib/session";
-import { ZONA_HORARIA, aISO, finDia, inicioDia, parseFechaISO } from "@/lib/fechas";
+import { ZONA_HORARIA, aISO, rangoDias } from "@/lib/fechas";
 import { TIPOS_GASTO, canalVenta } from "@/lib/format";
 import { puedeVer } from "@/lib/permisos";
 
@@ -10,7 +10,8 @@ function csv(filas: (string | number | null | undefined)[][]): string {
     let s = v === null || v === undefined ? "" : String(v);
     // Evita que Excel interprete un texto como fórmula (=, +, -, @).
     if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    // También \r: un salto de línea suelto podía empezar una fila nueva en Excel.
+    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   // ";" y BOM para que Excel en español lo abra bien
   return "﻿" + filas.map((f) => f.map(esc).join(";")).join("\r\n");
@@ -24,12 +25,12 @@ export async function GET(
 ) {
   const { tipo } = await params;
   const s = await getSesion();
-  if (!s || s.debeCambiarClave) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (!puedeVer(s, "reportes")) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  if (!s || s.debeCambiarClave) return NextResponse.json({ error: "Su sesión terminó. Vuelva a entrar al sistema." }, { status: 401 });
+  if (!puedeVer(s, "reportes")) return NextResponse.json({ error: "No tiene permiso para descargar esto." }, { status: 403 });
   const { localId } = await getAlcance(s);
   const whereLocal = localId ? { localId } : {};
-  const desde = inicioDia(parseFechaISO(req.nextUrl.searchParams.get("desde")));
-  const hasta = finDia(parseFechaISO(req.nextUrl.searchParams.get("hasta")));
+  // Como máximo un año por archivo; fechas al revés se intercambian.
+  const { desde, hasta } = rangoDias(req.nextUrl.searchParams.get("desde"), req.nextUrl.searchParams.get("hasta"));
 
   let filas: (string | number | null)[][] = [];
   if (tipo === "ventas") {

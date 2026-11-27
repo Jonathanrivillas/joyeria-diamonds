@@ -334,12 +334,72 @@ async function cargarPrueba() {
 }
 
 // ======================================================================
+//  PRODUCCION: dejar la base real lista para el primer día
+// ======================================================================
+async function dejarListaProduccion() {
+  const admin = await db.usuario.findUnique({ where: { email: ADMIN_QUE_QUEDA } });
+  if (!admin || admin.rol !== "ADMIN" || !admin.activo) throw new Error(`No hay un administrador activo con el correo ${ADMIN_QUE_QUEDA}. Cambie ADMIN_QUE_QUEDA.`);
+  console.log("Borrando movimientos, usuarios de prueba, proveedores de prueba y precios viejos…");
+  await borrarMovimientos();
+  await db.$transaction(async (tx) => {
+    await tx.precioGramo.deleteMany(); // el administrador pone el precio real el primer día
+    await tx.proveedor.deleteMany(); // ya no tienen gastos, ventas ni joyas (se borraron arriba)
+    const u = await tx.usuario.deleteMany({ where: { id: { not: admin.id } } });
+    // Los productos de Alegra eran de la cuenta de PRUEBA: con la cuenta real se crean solos al
+    // facturar (o con scripts/enlazar-alegra.ts).
+    await tx.categoria.updateMany({ data: { alegraItemId: null } });
+    await tx.auditoria.create({ data: { accion: "BASE_LISTA_PRODUCCION", usuarioId: admin.id, usuarioNombre: admin.nombre } });
+    console.log(`✅ Base lista para el primer día. ${u.count} usuarios de prueba borrados; queda ${admin.nombre} (${admin.email}).`);
+    console.log("   Siguiente: entrar, poner el precio del gramo, crear los usuarios reales e ingresar el inventario.");
+  });
+}
+
+// ======================================================================
 async function main() {
-  const modo = process.argv.includes("--cero") ? "CERO" : process.argv.includes("--prueba") ? "PRUEBA" : MODO;
+  const modo = process.argv.includes("--produccion")
+    ? "PRODUCCION"
+    : process.argv.includes("--cero")
+      ? "CERO"
+      : process.argv.includes("--prueba")
+        ? "PRUEBA"
+        : MODO;
   const url = (process.env.DATABASE_URL ?? "").replace(/\/\/[^@]*@/, "//***@").split("?")[0];
+  let servidor = "";
+  try {
+    servidor = new URL(process.env.DATABASE_URL ?? "").hostname;
+  } catch {
+    throw new Error("DATABASE_URL no está configurada o no es válida.");
+  }
   console.log(`Modo: ${modo}  ·  Base: ${url}`);
+
+  // ── Seguros: este script BORRA datos ──
+  if (modo === "PRODUCCION") {
+    // La base real solo se prepara escribiendo su servidor a mano: no se puede correr por error.
+    const confirmado = process.argv.find((x) => x.startsWith("--confirmar="))?.slice("--confirmar=".length);
+    if (confirmado !== servidor) {
+      console.log(`Para preparar esta base para el primer día, agregue: --confirmar=${servidor}`);
+      process.exitCode = 1;
+      return;
+    }
+  } else {
+    // Datos de prueba / cero: solo en bases marcadas como de desarrollo en el .env de su computador.
+    const permitidos = (process.env.DATOS_PERMITIDOS_HOSTS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    if (process.env.NODE_ENV === "production" || !permitidos.some((p) => servidor.includes(p))) {
+      console.log("⛔ No se hizo nada: esta base no está marcada como de desarrollo.");
+      console.log(`   Si de verdad es su base de pruebas, agregue en su .env:  DATOS_PERMITIDOS_HOSTS=${servidor.split(".")[0].replace(/-pooler$/, "")}`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   if (!process.argv.includes("--si")) {
-    console.log(modo === "CERO" ? "Borraría todo y dejaría solo a " + ADMIN_QUE_QUEDA + "." : "Borraría los movimientos y cargaría 30 días de datos de prueba.");
+    console.log(
+      modo === "PRODUCCION"
+        ? "Dejaría la base lista para el primer día (sin datos de prueba)."
+        : modo === "CERO"
+          ? "Borraría todo y dejaría solo a " + ADMIN_QUE_QUEDA + "."
+          : "Borraría los movimientos y cargaría 30 días de datos de prueba.",
+    );
     console.log("No se hizo nada. Para confirmar, agregue --si al final del comando.");
     return;
   }
@@ -349,7 +409,8 @@ async function main() {
     await new Promise((r) => setTimeout(r, 1000));
   }
   process.stdout.write("\rEmpezó. Esto tarda uno o dos minutos; no cierre la terminal.\n");
-  if (modo === "CERO") await dejarEnCero();
+  if (modo === "PRODUCCION") await dejarListaProduccion();
+  else if (modo === "CERO") await dejarEnCero();
   else await cargarPrueba();
 }
 
