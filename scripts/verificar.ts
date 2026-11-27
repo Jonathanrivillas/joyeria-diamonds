@@ -23,10 +23,21 @@ async function consistencia() {
 
 async function main() {
   let fallos = await consistencia();
+
+  // La prueba de venta + anulación escribe en la base y gasta un número de factura:
+  // solo en bases de desarrollo (las mismas que permite scripts/datos.ts).
+  const servidor = (process.env.DATABASE_URL ?? "").replace(/^[a-z]+:\/\/[^@]*@/, "").split(/[/:?]/)[0];
+  const permitidos = (process.env.DATOS_PERMITIDOS_HOSTS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === "production" || !permitidos.some((p) => servidor.includes(p))) {
+    console.log("· Prueba de venta y anulación omitida: esta base no está marcada como de desarrollo (solo se revisó el kardex).");
+    if (fallos) process.exit(1);
+    return;
+  }
+
   const cadenas = await db.categoria.findUniqueOrThrow({ where: { nombre: "Cadenas" } });
-  const vend = await db.usuario.findUniqueOrThrow({ where: { email: "vendedor1@joyeria.com" } });
+  const vend = await db.usuario.findFirstOrThrow({ where: { rol: "VENDEDOR", activo: true, localId: { not: null } } });
   const localId = vend.localId!;
-  const admin = await db.usuario.findUniqueOrThrow({ where: { email: "admin@joyeria.com" } });
+  const admin = await db.usuario.findFirstOrThrow({ where: { rol: "ADMIN", activo: true } });
   const antes = await db.existencia.findUniqueOrThrow({ where: { localId_categoriaId: { localId, categoriaId: cadenas.id } } });
 
   // Venta de 5,20 g de Cadenas

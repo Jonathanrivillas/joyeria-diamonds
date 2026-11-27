@@ -10,7 +10,7 @@ export function leerPagina(v: string | undefined): number {
 
 /** Id que viene en la dirección (?vendedor=3). Si no es un número entero válido, undefined. */
 export function leerId(v: string | undefined | null): number | undefined {
-  if (!v || !/^d{1,9}$/.test(v)) return undefined;
+  if (!v || !/^\d{1,9}$/.test(v)) return undefined;
   const n = Number(v);
   return n > 0 ? n : undefined;
 }

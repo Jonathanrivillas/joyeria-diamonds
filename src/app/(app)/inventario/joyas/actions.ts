@@ -37,7 +37,7 @@ export async function registrarJoya(_prev: EstadoJoya, form: FormData): Promise<
   if (descripcion.length > 120) return { error: "La descripción es muy larga (máximo 120 letras)." };
   if (codigoManual && !/^[A-Z0-9-]{2,20}$/.test(codigoManual))
     return { error: "El código solo puede tener letras, números y guiones (ej. ESM-015)." };
-  if (/^JP-d+$/.test(codigoManual))
+  if (/^JP-\d+$/i.test(codigoManual))
     return { error: "Los códigos JP-0001, JP-0002… los pone el sistema. Use otro, o deje el código vacío." };
   if (Number.isNaN(pesoCg) || pesoCg <= 0) return { error: "Escriba cuánto pesa la joya." };
   if (pesoCg > 10_000_000) return { error: "El peso es demasiado alto. Revíselo." };
